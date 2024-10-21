@@ -58,10 +58,10 @@ uint32_t heap[7168] = {0};           // 7168 * 4 bytes = 28672 bytes
 //
 //*****************************************************************************
 // To be added by user
-extern void busFaultHandler(void);
-extern void usageFaultHandler(void);
-extern void hardFaultHandler(void);
-extern void mmuFaultHandler(void);
+extern void mpuFaultIsr(void);
+extern void hardFaultIsr(void);
+extern void busFaultIsr(void);
+extern void usageFaultIsr(void);
 extern void pendSVHandler(void);
 
 //*****************************************************************************
