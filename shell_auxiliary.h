@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uart0.h" 
-#include "mini.h"
+// #include "mini.h"
 #include "tm4c123gh6pm.h"
-#include "nano_commands.h"
+// #include "nano_commands.h"
 #include "clock.h"
-#include "ports.h"
+// #include "ports.h"
 
 
 // Maximum number of chars that can be accepted from the user
@@ -16,7 +16,17 @@
 #define MAX_CHARS 80
 #define MAX_FIELDS 5
 
-#define NULL 0
+#define ASCII_0 48
+#define ASCII_9 57
+#define ASCII_MINUS 45
+#define ASCII_BACKSPACE 8
+#define ASCII_DELETE 127
+#define ASCII_A 65
+#define ASCII_Z 90
+#define ASCII_a 97
+#define ASCII_z 122
+
+#define tNULL 0
 
 typedef struct _USER_DATA
 {
