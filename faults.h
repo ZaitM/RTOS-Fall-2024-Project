@@ -10,6 +10,8 @@
 
 #ifndef FAULTS_H_
 #define FAULTS_H_
+#include <stdint.h>
+#include <stdbool.h>
 
 //-----------------------------------------------------------------------------
 // Subroutines
