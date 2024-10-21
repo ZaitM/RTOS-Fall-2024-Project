@@ -49,12 +49,20 @@ extern void _c_int00(void);
 //*****************************************************************************
 extern uint32_t __STACK_TOP;
 
+#pragma DATA_SECTION(heap, ".heap")
+uint32_t heap[7168] = {0};           // 7168 * 4 bytes = 28672 bytes
+
 //*****************************************************************************
 //
 // External declarations for the interrupt handlers used by the application.
 //
 //*****************************************************************************
 // To be added by user
+extern void busFaultHandler(void);
+extern void usageFaultHandler(void);
+extern void hardFaultHandler(void);
+extern void mmuFaultHandler(void);
+extern void pendSVHandler(void);
 
 //*****************************************************************************
 //
@@ -70,10 +78,10 @@ void (* const g_pfnVectors[])(void) =
                                             // The initial stack pointer
     ResetISR,                               // The reset handler
     NmiSR,                                  // The NMI handler
-    FaultISR,                               // The hard fault handler
-    IntDefaultHandler,                      // The MPU fault handler
-    IntDefaultHandler,                      // The bus fault handler
-    IntDefaultHandler,                      // The usage fault handler
+    hardFaultHandler,                               // The hard fault handler
+    mmuFaultHandler,                      // The MPU fault handler
+    busFaultHandler,                        // The bus fault handler
+    usageFaultHandler,                      // The usage fault handler
     0,                                      // Reserved
     0,                                      // Reserved
     0,                                      // Reserved
@@ -81,7 +89,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // SVCall handler
     IntDefaultHandler,                      // Debug monitor handler
     0,                                      // Reserved
-    IntDefaultHandler,                      // The PendSV handler
+    pendSVHandler,                      // The PendSV handler
     IntDefaultHandler,                      // The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
     IntDefaultHandler,                      // GPIO Port B
