@@ -11,3 +11,4 @@ Debug/
 .project
 .settings/
 targetConfigs/
+*.txt
