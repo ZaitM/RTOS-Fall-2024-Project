@@ -10,6 +10,8 @@
 
 #ifndef MM_H_
 #define MM_H_
+#include <stdint.h>
+#include <stdbool.h>
 
 #define NUM_SRAM_REGIONS 5
 
