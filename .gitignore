@@ -1,4 +1,7 @@
 .vscode/
+<<<<<<< HEAD
 *./
 *.vscode/
 .vscode
+=======
+>>>>>>> main
