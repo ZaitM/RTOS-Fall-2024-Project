@@ -5,3 +5,9 @@
 .vscode
 =======
 >>>>>>> main
+.ccsproject
+.cproject
+Debug/
+.project
+.settings/
+targetConfigs/
