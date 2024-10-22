@@ -16,6 +16,8 @@
 #include "tm4c123gh6pm.h"
 #include "shell.h"
 #include "shell_auxiliary.h"
+#include "shell_commands.h"
+#include "CortexM4Registers.h"
 
 // REQUIRED: Add header files here for your strings functions, ...
 
