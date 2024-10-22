@@ -16,7 +16,7 @@ void getsUart0(USER_DATA *dataStruct)
             10: Line Feed
             13: Carriage Return
         */
-        while (c == 127 && (count == 0 | count == 1))
+        while (c == ASCII_DELETE && (count == 0 | count == 1))
         {
             if (count > 0)
                 count--;
@@ -24,7 +24,7 @@ void getsUart0(USER_DATA *dataStruct)
         }
 
         // Delete or Backspace
-        count = ((c == 8) | (c == 127)) ? (count > 0 ? --count : count) : ++count;
+        count = ((c == ASCII_BACKSPACE) | (c == ASCII_DELETE)) ? (count > 0 ? --count : count) : ++count;
 
         // LF or CR i.e (Enter or Max char reached) add null terminator
         if ((c == 10 | c == 13) | count == MAX_CHARS)
@@ -47,7 +47,7 @@ void getsUart0(USER_DATA *dataStruct)
  */
 bool isAlpha(char c)
 {
-    return (c >= 65 && c <= 90) | (c >= 97 && c <= 122) ? true : false;
+    return (c >= ASCII_A && c <= ASCII_Z) | (c >= ASCII_a && c <= ASCII_z) ? true : false;
 }
 
 /**
@@ -57,7 +57,7 @@ bool isAlpha(char c)
  */
 bool isNumeric(char c)
 {
-    return (c >= 48 && c <= 57) | (c >= 44 && c <= 46) ? true : false;
+    return (c >= ASCII_0 && c <= ASCII_9) | (c >= ASCII_COMMA && c <= ASCII_PERIOD) ? true : false;
 }
 
 void parseFields(USER_DATA *dataStruct)
@@ -140,7 +140,7 @@ int32_t atoi(char *str)
 
     // If it is a negative number
     // Start from the next character
-    uint8_t i = str[0] == 45 ? 1 : 0;
+    uint8_t i = str[0] == ASCII_MINUS ? 1 : 0;
     int32_t value = 0;
 
     while (str[i] != 0)
@@ -210,13 +210,13 @@ void itoa(uint32_t value, char str[], uint8_t base)
         if (base == 16)
         {
             remainder = (value - (base * (value >> 4)));
-            remainder = remainder < 10 ? remainder + 48 : remainder + 55;
+            remainder = remainder < 10 ? remainder + ASCII_0 : remainder + 55;
             buffer[i++] = remainder;
             value >>= 4;
         }
         else
         {
-            buffer[i++] = value % base + 48;
+            buffer[i++] = value % base + ASCII_0;
             value /= base;
         }
     }
