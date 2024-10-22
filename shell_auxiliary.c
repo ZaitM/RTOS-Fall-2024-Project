@@ -199,6 +199,11 @@ bool strCmp(const char str1[], const char str2[])
     return true;
 }
 
+/**
+ * @brief
+ * Convert uin32_t to string i.e ASCII
+ * Either base 10 or base 16
+ */
 void itoa(uint32_t value, char str[], uint8_t base)
 {
     uint8_t i = 0;
