@@ -3,28 +3,29 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "uart0.h" 
+#include "uart0.h"
 // #include "mini.h"
 #include "tm4c123gh6pm.h"
 // #include "nano_commands.h"
 #include "clock.h"
 // #include "ports.h"
 
-
 // Maximum number of chars that can be accepted from the user
 // and the structure for holding UI info
 #define MAX_CHARS 80
 #define MAX_FIELDS 5
 
+#define ASCII_BACKSPACE 8
+#define ASCII_COMMA 44
+#define ASCII_MINUS 45
+#define ASCII_PERIOD 46
 #define ASCII_0 48
 #define ASCII_9 57
-#define ASCII_MINUS 45
-#define ASCII_BACKSPACE 8
-#define ASCII_DELETE 127
 #define ASCII_A 65
 #define ASCII_Z 90
 #define ASCII_a 97
 #define ASCII_z 122
+#define ASCII_DELETE 127
 
 #define tNULL 0
 
@@ -75,7 +76,7 @@ char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber);
  * @param str
  * @return int32_t
  */
-//int32_t atoi(char *str);
+// int32_t atoi(char *str);
 //
 /**
  * @brief Function to return the integer value of the field if it exists and is numeric
@@ -107,12 +108,11 @@ bool isCommand(USER_DATA *dataStruct, const char command[], uint8_t minArgs);
 bool strCmp(const char str1[], const char str2[]);
 
 /**
- * @brief 
+ * @brief
  * Convert uin32_t to string i.e ASCII
  * Either base 10 or base 16
- * 
+ *
  */
 void itoa(uint32_t value, char str[], uint8_t base);
 
 #endif
-
