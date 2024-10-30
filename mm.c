@@ -23,7 +23,119 @@
 // REQUIRED: add your malloc code here and update the SRD bits for the current thread
 void *mallocFromHeap(uint32_t size_in_bytes)
 {
-    return 0;
+    uint32_t alignedSize = ALIGN_SIZE(size);
+    void *address = allocate_from_subregion(alignedSize);
+
+    return address != NULL ? address : NULL;
+}
+
+void *allocate_from_subregion(uint32_t size)
+{
+    // Number of sections needed according to the section size
+    uint32_t neededSections = size / SECTION_SIZE(size);
+    uint32_t remainingSize = size;
+    uint32_t j = 0, eightKregionIdx = 1, fourKregionIdx = 0;
+
+    void *ptrSubRegion = NULL;
+
+    // First check 1KB sections
+    for (eightKregionIdx; eightKregionIdx <= TOTAL_8K_REGIONS; eightKregionIdx++)
+    {
+        // Once we have allocated exit and don't check the other regions
+        if (remainingSize <= 0)
+            break;
+
+        uint32_t sectionIdx = 0;
+
+        for (sectionIdx; sectionIdx <= SUBREGIONS_PER_REGION; sectionIdx++)
+        {
+            // Once we have allocated exit
+            if (!remainingSize)
+                break;
+
+            // Sweep
+            for (j = 0; j < neededSections; j++)
+            {
+                // Added logic to check out of bounds indexing
+                if (regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
+                    break;
+
+                else
+                {
+                    if (ptrSubRegion == NULL)
+                    {
+                        ptrSubRegion = regions[eightKregionIdx].baseAddress + sectionIdx * BLOCK_1024;
+                        regions[eightKregionIdx].sizeOfAllocations[sectionIdx] = size;
+                    }
+
+                    regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] = ALLOCATED;
+                    remainingSize -= BLOCK_1024;
+
+                    /*
+                        If we ran out of space in the 8K region
+                        check if there is space in the following
+                        4K region and set the 4K region index to R3
+
+                        IF the first index of the 4K region is not allocated
+                        then we can allocate in that region
+                    */
+                    fourKregionIdx = regions[R3_IDX].subRegionAllocated[0] == FREE ? R3_IDX : R0_IDX;
+                }
+            }
+        }
+    }
+
+    /*
+        Need to recaluclate the number of sections needed if
+        we ran out of space in the 8K regions
+    */
+    neededSections = remainingSize / BLOCK_512;
+
+    // Check 512B sections
+    for (fourKregionIdx; fourKregionIdx < TOTAL_REGIONS; fourKregionIdx++)
+    {
+        if (regions[fourKregionIdx].subRegionSize == BLOCK_512)
+        {
+            // Once we have allocated exit and don't check the other regions
+            if (remainingSize <= 0)
+                break;
+
+            uint32_t sectionIdx = 0;
+
+            for (sectionIdx; sectionIdx <= (SUBREGIONS_PER_REGION - neededSections); sectionIdx++)
+            {
+                // Once we have allocated exit
+                if (!remainingSize)
+                    break;
+
+                // Sweep
+                for (j = 0; j < neededSections; j++)
+                {
+                    // Added logic to check out of bounds indexing
+                    if (regions[fourKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
+                        break;
+
+                    else
+                    {
+                        if (ptrSubRegion == NULL)
+                        {
+                            ptrSubRegion = regions[fourKregionIdx].baseAddress + sectionIdx * BLOCK_512;
+                            regions[fourKregionIdx].sizeOfAllocations[sectionIdx] = size;
+                        }
+
+                        regions[fourKregionIdx].subRegionAllocated[sectionIdx + j] = ALLOCATED;
+                        remainingSize -= BLOCK_512;
+                    }
+                }
+            }
+        }
+    }
+
+    // Not enough space
+    if (remainingSize > 0)
+        return NULL;
+    else
+        return ptrSubRegion;
 }
 
 // REQUIRED: add your free code here and update the SRD bits for the current thread
@@ -189,7 +301,6 @@ uint64_t createNoSramAccessMask(void)
  */
 void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_in_bytes)
 {
-
 }
 
 /**
