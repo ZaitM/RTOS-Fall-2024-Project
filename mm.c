@@ -15,6 +15,19 @@
 #include <stdint.h>
 #include "tm4c123gh6pm.h"
 #include "mm.h"
+#include "shell_auxiliary.h"
+
+//-----------------------------------------------------------------------------
+// Global variables 
+//-----------------------------------------------------------------------------
+MEM_REGION regions[TOTAL_REGIONS] =
+    {
+        {BASE_R0, REGION_4KB, BLOCK_512, {FREE}, {0}},
+        {BASE_R1, REGION_8KB, BLOCK_1024, {FREE}, {0}},
+        {BASE_R2, REGION_8KB, BLOCK_1024, {FREE}, {0}},
+        {BASE_R3, REGION_4KB, BLOCK_512, {FREE}, {0}},
+        {BASE_R4, REGION_4KB, BLOCK_512, {FREE}, {0}},
+};
 
 //-----------------------------------------------------------------------------
 // Subroutines
@@ -23,7 +36,7 @@
 // REQUIRED: add your malloc code here and update the SRD bits for the current thread
 void *mallocFromHeap(uint32_t size_in_bytes)
 {
-    uint32_t alignedSize = ALIGN_SIZE(size);
+    uint32_t alignedSize = ALIGN_SIZE(size_in_bytes);
     void *address = allocate_from_subregion(alignedSize);
 
     return address != NULL ? address : NULL;
