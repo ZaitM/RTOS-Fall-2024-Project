@@ -18,7 +18,7 @@
 #include "shell_auxiliary.h"
 
 //-----------------------------------------------------------------------------
-// Global variables 
+// Global variables
 //-----------------------------------------------------------------------------
 MEM_REGION regions[TOTAL_REGIONS] =
     {
@@ -66,10 +66,20 @@ void *allocate_from_subregion(uint32_t size)
             if (!remainingSize)
                 break;
 
-            // Sweep
+            /*
+                Sweep
+                For each needed section check if the section is allocated
+            */
+
             for (j = 0; j < neededSections; j++)
             {
-                // Added logic to check out of bounds indexing
+                /*
+                    If the section is
+                    - allocated
+                    - or the remaining size is 0
+                    - or the section index is out of bounds
+                    then break
+                */
                 if (regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
                     break;
 
@@ -99,7 +109,7 @@ void *allocate_from_subregion(uint32_t size)
     }
 
     /*
-        Need to recaluclate the number of sections needed if
+        Need to recalculate the number of sections needed if
         we ran out of space in the 8K regions
     */
     neededSections = remainingSize / BLOCK_512;
@@ -109,13 +119,29 @@ void *allocate_from_subregion(uint32_t size)
     {
         if (regions[fourKregionIdx].subRegionSize == BLOCK_512)
         {
+            // Different counter used
+            uint32_t innerNeededSections = neededSections;
+
             // Once we have allocated exit and don't check the other regions
             if (remainingSize <= 0)
                 break;
 
             uint32_t sectionIdx = 0;
+            /*
+                When I am in region 0 I need to sweep the region
+                to check that there is enough space to allocate.
+                Therefore in the for loop I need to check the difference
+                between the number of sections needed and the number of
+                sections in the region.
+                -> Momentarily I will set the needed sections to 0 if in region 0
 
-            for (sectionIdx; sectionIdx <= (SUBREGIONS_PER_REGION - neededSections); sectionIdx++)
+                When I am in region 3 and 4 I do not
+                need to stringently check the number of sections I need.
+            */
+            if (fourKregionIdx != R0_IDX)
+                innerNeededSections = FREE;
+
+            for (sectionIdx; sectionIdx <= (SUBREGIONS_PER_REGION - innerNeededSections); sectionIdx++)
             {
                 // Once we have allocated exit
                 if (!remainingSize)
@@ -124,7 +150,13 @@ void *allocate_from_subregion(uint32_t size)
                 // Sweep
                 for (j = 0; j < neededSections; j++)
                 {
-                    // Added logic to check out of bounds indexing
+                    /*
+                    If the section is
+                    - allocated
+                    - or the remaining size is 0
+                    - or the section index is out of bounds
+                    then break
+                    */
                     if (regions[fourKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
                         break;
 
