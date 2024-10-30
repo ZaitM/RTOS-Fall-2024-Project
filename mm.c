@@ -138,6 +138,7 @@ void *allocate_from_subregion(uint32_t size)
                 When I am in region 3 and 4 I do not
                 need to stringently check the number of sections I need.
             */
+            // Comment this out if you want the memory block to be allocated in the 4k region to be contiguous
             if (fourKregionIdx != R0_IDX)
                 innerNeededSections = FREE;
 
@@ -186,6 +187,96 @@ void *allocate_from_subregion(uint32_t size)
 // REQUIRED: add your free code here and update the SRD bits for the current thread
 void freeToHeap(void *pMemory)
 {
+
+    // Number of sections needed according to the section size
+    uint8_t subRegionIdx = ((uint32_t)pMemory - FIND_PTR_BASE(pMemory)) / FIND_PTR_SUBREGION_SIZE(pMemory);
+    uint8_t regionIdx = FIND_PTR_REGION_IDX(pMemory);
+    uint8_t subRegionIdxToStart = subRegionIdx;
+    uint32_t sizeOfAllocation = regions[regionIdx].sizeOfAllocations[subRegionIdx];
+    uint8_t sectionToFree = sizeOfAllocation / SECTION_SIZE(sizeOfAllocation);
+
+    int32_t remainingSize = sizeOfAllocation;
+    uint32_t j = 0, eightKregionIdx = regionIdx, fourKregionIdx = regionIdx;
+
+    if (eightKregionIdx >= R1_IDX && eightKregionIdx <= R2_IDX)
+    {
+        // First check 1KB sections
+        for (eightKregionIdx; eightKregionIdx <= TOTAL_8K_REGIONS; eightKregionIdx++)
+        {
+            // Sweep
+            for (j = 0; j < sectionToFree; j++)
+            {
+                /*
+                    If the section is
+                    - free
+                    - or the remaining size is less 0
+                    - or the section index is out of bounds
+                    then break
+                */
+                if (regions[eightKregionIdx].subRegionAllocated[subRegionIdx + j] == FREE || remainingSize <= FREE || (subRegionIdx + j) >= SUBREGIONS_PER_REGION)
+                {
+                    /*
+                     * Set subRegionIdx to zero so that when it goes to the next region it starts at idx = 0
+                     */
+                    subRegionIdx = 0;
+                    break;
+                }
+                else
+                {
+
+                    regions[eightKregionIdx].subRegionAllocated[subRegionIdx + j] = FREE;
+                    remainingSize -= BLOCK_1024;
+                }
+
+                /**
+                 * @brief
+                 *  In the case when we are in R2 and need to go to R3
+                 */
+                fourKregionIdx = regions[R3_IDX].subRegionAllocated[0] == ALLOCATED ? R3_IDX : regionIdx;
+            }
+            // Once we have freed everyting exit
+            if (!remainingSize)
+            {
+                regions[regionIdx].sizeOfAllocations[subRegionIdxToStart] = FREE;
+                break;
+            }
+        }
+    }
+
+    sectionToFree = remainingSize / BLOCK_512;
+    // Check 512B sections
+    for (fourKregionIdx; fourKregionIdx < TOTAL_REGIONS; fourKregionIdx++)
+    {
+        if (regions[fourKregionIdx].subRegionSize == BLOCK_512)
+        {
+
+            // Sweep
+            for (j = 0; j < sectionToFree; j++)
+            {
+                /*
+                    If the section is
+                    - free
+                    - or the remaining size is 0
+                    - or the section index is out of bounds
+                    then break
+                */
+                if (regions[fourKregionIdx].subRegionAllocated[subRegionIdx + j] == FREE || remainingSize == FREE || (subRegionIdx + j) >= SUBREGIONS_PER_REGION)
+                {
+                    subRegionIdx = 0;
+                    break;
+                }
+                regions[fourKregionIdx].subRegionAllocated[subRegionIdx + j] = FREE;
+                remainingSize -= BLOCK_512;
+            }
+
+            // Once we have freed everything exit
+            if (!remainingSize)
+            {
+                regions[regionIdx].sizeOfAllocations[subRegionIdxToStart] = FREE;
+                break;
+            }
+        }
+    }
 }
 
 /**
