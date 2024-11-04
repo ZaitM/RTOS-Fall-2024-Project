@@ -27,12 +27,6 @@
 
 #define SUBREGIONS_PER_REGION 8
 
-#define R0_IDX 0
-#define R1_IDX 1
-#define R2_IDX 2
-#define R3_IDX 3
-#define R4_IDX 4
-
 #define FREE 0
 #define ALLOCATED 1
 
@@ -78,6 +72,17 @@
 #define FIND_PTR_REGION_IDX(ptr) ((ptr >= BASE_R0 && ptr < END_OF_R0) ? R0_IDX: (ptr >= BASE_R1 && ptr < END_OF_R1) ? R1_IDX: (ptr >= BASE_R2 && ptr < END_OF_R2) ? R2_IDX: \
 (ptr >= BASE_R3 && ptr < END_OF_R3) ? R3_IDX: (ptr >= BASE_R4 && ptr < END_OF_R4) ? R4_IDX: -1)
 
+//-----------------------------------------------------------------------------
+// Mask values for the MPU
+//-----------------------------------------------------------------------------
+#define FULL_ACCESS 0b011  // Full access for unprivileged
+#define SRD_DISABLE 0xFF    // Disable all subregions
+#define R0_IDX 0
+#define R1_IDX 1
+#define R2_IDX 2
+#define R3_IDX 3
+#define R4_IDX 4
+
 typedef struct
 {
     uint32_t baseAddress;
@@ -87,7 +92,6 @@ typedef struct
                             // &= 0 to set a subregion as free
     uint8_t subRegionAllocated[8];
     uint16_t sizeOfAllocations[8];
-    bool regionFull;
 
 } MEM_REGION;
 
@@ -96,7 +100,10 @@ typedef struct
 //-----------------------------------------------------------------------------
 
 void * mallocFromHeap(uint32_t size_in_bytes);
+void *allocate_from_subregion(uint32_t size);   // Added 10/29/24
 void freeToHeap(void *pMemory);
+
+void enableMPU(void);
 
 void allowFlashAccess(void);
 void allowPeripheralAccess(void);
