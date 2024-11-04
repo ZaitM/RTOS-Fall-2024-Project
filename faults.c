@@ -15,8 +15,10 @@
 #include <stdint.h>
 #include "tm4c123gh6pm.h"
 #include "faults.h"
+#include "CortexM4Registers.h"
+#include "shell_auxiliary.h"
 //-----------------------------------------------------------------------------
-// Globals 
+// Globals
 //-----------------------------------------------------------------------------
 volatile bool foo = false;
 
@@ -31,7 +33,7 @@ volatile bool foo = false;
 void mpuFaultIsr(void)
 {
     char str[32];
-    uint32_t *psp = (uint32_t *)getPSP();
+    uint32_t *psp = getPSP();
     uint32_t pc = getPC();
 
     putsUart0("MMU fault in PID:\n\n");
@@ -214,4 +216,10 @@ void usageFaultIsr(void)
     while (true)
     {
     };
+}
+
+void causeHardFault(void)
+{
+    foo = true;
+    causeBusFault(); // Tries to read reserved memory
 }
