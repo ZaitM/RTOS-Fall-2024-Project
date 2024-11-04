@@ -183,6 +183,22 @@ void itoa(uint32_t value, char str[], uint8_t base)
 }
 
 /**
+ * @brief Copy string from str1 to str2
+ * @param str1
+ * @param str2
+ */
+void strCopy(char *dstStr, char *srcStr)
+{
+    uint8_t i = 0;
+    while (srcStr[i] != NULL)
+    {
+        dstStr[i] = srcStr[i];
+        i++;
+    }
+    dstStr[i] = NULL;
+}
+
+/**
  * @brief Get the field value
  * @param dataStruct
  * @param fieldNumber
