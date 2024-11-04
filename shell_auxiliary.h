@@ -39,13 +39,13 @@ bool isNumeric(char c);
 bool isCommand(USER_DATA *dataStruct, const char command[], uint8_t minArgs);
 bool strCmp(const char str1[], const char str2[]);
 
-void itoa(uint32_t value, char str[], uint8_t base);
+void getsUart0(USER_DATA *dataStruct);
 void parseFields(USER_DATA *dataStruct);
 void clearStruct(USER_DATA *dataStruct);
-void getsUart0(USER_DATA *dataStruct);
+void itoa(uint32_t value, char str[], uint8_t base);
 
 char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber);
-// int32_t atoi(char *str);
 int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber);
+// int32_t atoi(char *str);
 
 #endif

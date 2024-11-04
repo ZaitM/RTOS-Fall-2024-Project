@@ -1,5 +1,59 @@
 #include "shell_auxiliary.h"
 
+/**
+ * @brief Detects wether it is alphabetic and returns a boolean
+ * @param c Input character
+ * @return bool
+ */
+bool isAlpha(char c)
+{
+    return (c >= ASCII_A && c <= ASCII_Z) | (c >= ASCII_a && c <= ASCII_z) ? true : false;
+}
+
+/**
+ * @brief Detects wether char is numeric
+ * @param c Input character
+ * @return bool
+ */
+bool isNumeric(char c)
+{
+    return (c >= ASCII_0 && c <= ASCII_9) | (c >= ASCII_COMMA && c <= ASCII_PERIOD) ? true : false;
+}
+
+/**
+ * @brief Determine if provide command with minimum number
+ * of arguments satisfies contents in buffer
+ *
+ * @param dataStruct
+ * @param command
+ * @param minArgs
+ * @return true If valid input from user
+ * @return false
+ */
+bool isCommand(USER_DATA *dataStruct, const char command[], uint8_t minArgs)
+{
+    uint8_t i = 0;
+    for (i = 0; dataStruct->buffer[i] != 0; i++)
+    {
+        // If command field does not match command parameter return false
+        if (dataStruct->buffer[i] != command[i])
+            return false;
+    }
+    return ((dataStruct->fieldCount - 1) >= minArgs) ? true : false;
+}
+
+bool strCmp(const char str1[], const char str2[])
+{
+    uint8_t i = 0;
+    while (str1[i] != 0 || str2[i] != 0)
+    {
+        if (str1[i] != str2[i])
+            return false;
+        i++;
+    }
+    return true;
+}
+
 void getsUart0(USER_DATA *dataStruct)
 {
     uint8_t count = 0;
@@ -40,26 +94,6 @@ void getsUart0(USER_DATA *dataStruct)
     } while (dataStruct->buffer[count - 1] != 0);
 }
 
-/**
- * @brief Detects wether it is alphabetic and returns a boolean
- * @param c Input character
- * @return bool
- */
-bool isAlpha(char c)
-{
-    return (c >= ASCII_A && c <= ASCII_Z) | (c >= ASCII_a && c <= ASCII_z) ? true : false;
-}
-
-/**
- * @brief Detects wether char is numeric
- * @param c Input character
- * @return bool
- */
-bool isNumeric(char c)
-{
-    return (c >= ASCII_0 && c <= ASCII_9) | (c >= ASCII_COMMA && c <= ASCII_PERIOD) ? true : false;
-}
-
 void parseFields(USER_DATA *dataStruct)
 {
     /**
@@ -95,6 +129,7 @@ void parseFields(USER_DATA *dataStruct)
         dataStruct->buffer[count - 1] = 0;
     }
 }
+
 /**
  * @brief Clear the struct members
  *
@@ -111,92 +146,6 @@ void clearStruct(USER_DATA *dataStruct)
         dataStruct->fieldType[i] = 0;
     }
     dataStruct->fieldCount = 0;
-}
-/**
- * @brief Get the field value
- * @param dataStruct
- * @param fieldNumber
- *
- * @return The value of the field requested if it exists or NULL otherwise
- */
-char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber)
-{
-    return fieldNumber < dataStruct->fieldCount ? &dataStruct->buffer[dataStruct->fieldPosition[fieldNumber]] : NULL;
-}
-
-/**
- * @brief ASCII to integer conversion
- * @param str
- * @return int32_t
- */
-int32_t atoi(char *str)
-{
-    /*
-    ASCII values:
-    45: '-'
-    48: '0'
-    57: '9'
-    */
-
-    // If it is a negative number
-    // Start from the next character
-    uint8_t i = str[0] == ASCII_MINUS ? 1 : 0;
-    int32_t value = 0;
-
-    while (str[i] != 0)
-    {
-        value = value * 10 + (str[i++] - 48);
-    }
-    return value;
-}
-
-/**
- * @brief Function to return the integer value of the field if it exists and is numeric
- * otherwise it returns 0
- * @param dataStruct
- * @param fieldNumber
- * @return int
- */
-int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber)
-{
-    /*
-        ASCII values:
-        110: 'n'
-    */
-    return (fieldNumber < dataStruct->fieldCount) && (dataStruct->fieldType[fieldNumber] == 110) ? atoi(getFieldString(dataStruct, fieldNumber)) : 0;
-}
-/**
- * @brief Determine if provide command with minimum number
- * of arguments satisfies contents in buffer
- *
- * @param dataStruct
- * @param command
- * @param minArgs
- * @return true If valid input from user
- * @return false
- */
-bool isCommand(USER_DATA *dataStruct, const char command[], uint8_t minArgs)
-{
-    uint8_t i = 0;
-    for (i = 0; dataStruct->buffer[i] != 0; i++)
-    {
-        // If command field does not match command parameter return false
-        if (dataStruct->buffer[i] != command[i])
-            return false;
-    }
-    return ((dataStruct->fieldCount - 1) >= minArgs) ? true : false;
-}
-
-bool strCmp(const char str1[], const char str2[])
-{
-    uint8_t i = 0;
-    while (str1[i] != 0 || str2[i] != 0)
-    {
-        if (str1[i] != str2[i])
-            return false;
-        i++;
-    }
-    return true;
 }
 
 /**
@@ -231,4 +180,58 @@ void itoa(uint32_t value, char str[], uint8_t base)
         str[j++] = buffer[--i];
     }
     str[j] = 0;
+}
+
+/**
+ * @brief Get the field value
+ * @param dataStruct
+ * @param fieldNumber
+ *
+ * @return The value of the field requested if it exists or NULL otherwise
+ */
+char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber)
+{
+    return fieldNumber < dataStruct->fieldCount ? &dataStruct->buffer[dataStruct->fieldPosition[fieldNumber]] : NULL;
+}
+
+/**
+ * @brief Function to return the integer value of the field if it exists and is numeric
+ * otherwise it returns 0
+ * @param dataStruct
+ * @param fieldNumber
+ * @return int
+ */
+int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber)
+{
+    /*
+        ASCII values:
+        110: 'n'
+    */
+    return (fieldNumber < dataStruct->fieldCount) && (dataStruct->fieldType[fieldNumber] == 110) ? atoi(getFieldString(dataStruct, fieldNumber)) : 0;
+}
+
+/**
+ * @brief ASCII to integer conversion
+ * @param str
+ * @return int32_t
+ */
+int32_t atoi(char *str)
+{
+    /*
+    ASCII values:
+    45: '-'
+    48: '0'
+    57: '9'
+    */
+
+    // If it is a negative number
+    // Start from the next character
+    uint8_t i = str[0] == ASCII_MINUS ? 1 : 0;
+    int32_t value = 0;
+
+    while (str[i] != 0)
+    {
+        value = value * 10 + (str[i++] - 48);
+    }
+    return value;
 }
