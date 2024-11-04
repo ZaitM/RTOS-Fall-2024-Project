@@ -4,11 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uart0.h"
-// #include "mini.h"
 #include "tm4c123gh6pm.h"
-// #include "nano_commands.h"
 #include "clock.h"
-// #include "ports.h"
 
 // Maximum number of chars that can be accepted from the user
 // and the structure for holding UI info
