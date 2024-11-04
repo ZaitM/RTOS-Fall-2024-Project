@@ -193,6 +193,15 @@ void freeToHeap(void *pMemory)
     uint8_t regionIdx = FIND_PTR_REGION_IDX(pMemory);
     uint8_t subRegionIdxToStart = subRegionIdx;
     uint32_t sizeOfAllocation = regions[regionIdx].sizeOfAllocations[subRegionIdx];
+    /*
+        Check the accuracy of results of the operaion
+        below.
+        Let's say we allocated 4 KiB
+        I have to either free:
+        - 4 sections
+        - 8 sectinos (When both 8 KiB regions are exhausted)
+
+    */
     uint8_t sectionToFree = sizeOfAllocation / SECTION_SIZE(sizeOfAllocation);
 
     int32_t remainingSize = sizeOfAllocation;
@@ -337,12 +346,12 @@ void setupSramAccess(void)
     */
     /********************************************************************************/
     // Set the region number to 0
-    NVIC_MPU_NUMBER_R = 0;
+    NVIC_MPU_NUMBER_R = R0_IDX;
     // Set the base address to the start of the SRAM
     NVIC_MPU_BASE_R = 0x20001000;
 
     // Every subregion is disabled
-    NVIC_MPU_ATTR_R = (0xFF << 8);
+    NVIC_MPU_ATTR_R = (SRD_DISABLE << 8);
 
     // Set the region size to 4KiB
     // Set to 11 for 4KB
@@ -350,14 +359,14 @@ void setupSramAccess(void)
     NVIC_MPU_ATTR_R |= 0b01011 << 1;
 
     // Set rw for unpriv
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
 
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
 
     /********************************************************************************/
     // Set the region number to 1
-    NVIC_MPU_NUMBER_R = 1;
+    NVIC_MPU_NUMBER_R = R1_IDX;
 
     // Set the base address to the start of the SRAM
     NVIC_MPU_BASE_R = 0x20002000;
@@ -368,14 +377,14 @@ void setupSramAccess(void)
     NVIC_MPU_ATTR_R |= 0b01100 << 1;
 
     // Set rw for unpriv
-    NVIC_MPU_ATTR_R |= 0b11 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
 
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
 
     /********************************************************************************/
     // Set the region number to 2
-    NVIC_MPU_NUMBER_R = 2;
+    NVIC_MPU_NUMBER_R = R2_IDX;
 
     // Set the base address to the start of the SRAM
     NVIC_MPU_BASE_R = 0x20004000;
@@ -384,14 +393,14 @@ void setupSramAccess(void)
     NVIC_MPU_ATTR_R |= 0b01100 << 1;
 
     // Set rw for unpriv
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
 
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
 
     /********************************************************************************/
     // Set the region number to 3
-    NVIC_MPU_NUMBER_R = 3;
+    NVIC_MPU_NUMBER_R = R3_IDX;
 
     // Set the base address to the start of the SRAM
     NVIC_MPU_BASE_R = 0x20006000;
@@ -402,14 +411,14 @@ void setupSramAccess(void)
     NVIC_MPU_ATTR_R |= 0b01011 << 1;
 
     // Set rw for unpriv
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
 
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
 
     /********************************************************************************/
     // Set the region number to 4
-    NVIC_MPU_NUMBER_R = 4;
+    NVIC_MPU_NUMBER_R = R4_IDX;
 
     // Set the base address to the start of the SRAM
     NVIC_MPU_BASE_R = 0x20007000;
@@ -420,7 +429,7 @@ void setupSramAccess(void)
     NVIC_MPU_ATTR_R |= 0b01011 << 1;
 
     // Set rw for unpriv
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
 
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
@@ -437,6 +446,119 @@ uint64_t createNoSramAccessMask(void)
  */
 void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_in_bytes)
 {
+    /*
+        Create a function that adds access to the
+        requested SRAM address range
+
+        We are going to assume that programmer does not surpass the
+        subregion disable bits
+
+        What that means is that if the baseAdd is in R0, the parameter
+        size_in_bytes should not exceed 4096
+    */
+
+    // Step 1: Determine base region
+    uint32_t baseRegion = FIND_PTR_BASE(baseAdd);
+    uint32_t startSubregion = ((uint32_t)baseAdd - baseRegion) / FIND_PTR_SUBREGION_SIZE(baseAdd); // Holds a value between 0 and 7
+    uint32_t mask = 0;
+
+    // Step 2: Calculate the appropriate mask for the given size
+    if (baseRegion != BASE_R1 && baseRegion != BASE_R2)
+    {
+        switch (size_in_bytes)
+        {
+        case 512:
+            mask = 0x01;
+            break;
+        case 1024:
+            mask = 0x03;
+            break;
+        case 1536:
+            mask = 0x07;
+            break;
+        case 2048:
+            mask = 0x0F;
+            break;
+        case 2560:
+            mask = 0x1F;
+            break;
+        case 3072:
+            mask = 0x3F;
+            break;
+        case 3584:
+            mask = 0x7F;
+            break;
+        case 4096:
+            mask = 0xFF;
+            break;
+        default:
+            putsUart0("Error: Unsupported size\n");
+            return;
+        }
+    }
+    else    // Base region is R1 or R2
+    {
+        switch (size_in_bytes)
+        {
+        case 1024:
+            mask = 0x01;
+            break;
+        case 2048:
+            mask = 0x03;
+            break;
+        case 3072:
+            mask = 0x07;
+            break;
+        case 4096:
+            mask = 0x0F;
+            break;
+        case 5120:
+            mask = 0x1F;
+            break;
+        case 6144:
+            mask = 0x3F;
+            break;
+        case 7168:
+            mask = 0x7F;
+            break;
+        case 8192:
+            mask = 0xFF;
+            break;
+        default:
+            putsUart0("Error: Unsupported size\n");
+            return;
+        }
+    }
+
+    // Step 3: Shift the mask to the appropriate subregion position
+    // Again startSubregion is between 0 and 7
+    // Does not overflow because of the assumption that the programmer does not surpass the subregion disable bits
+    mask <<= startSubregion;
+
+
+
+    // Step 4: Apply the mask to the SRD bit mask based on the base region
+    switch (baseRegion)
+    {
+    case BASE_R0:
+        *srdBitMask &= ~(mask);
+        break;
+    case BASE_R1:
+        *srdBitMask &= ~(mask << 8);
+        break;
+    case BASE_R2:
+        *srdBitMask &= ~(mask << 16);
+        break;
+    case BASE_R3:
+        *srdBitMask &= ~(mask << 24);
+        break;
+    case BASE_R4:
+        *srdBitMask &= ~(mask << 32);
+        break;
+    default:
+        putsUart0("Error: Invalid base region\n");
+        return;
+    }
 }
 
 /**
@@ -476,4 +598,22 @@ void applySramAccessMask(uint64_t srdBitMask)
     // Zero out SRD bits Easier to convert the SRDBITMASK
     NVIC_MPU_ATTR_R &= ~(0x0FF << 8);
     NVIC_MPU_ATTR_R |= (((srdBitMask >> 32) & 0xFF) << 8);
+}
+
+void enableMPU(void)
+{
+    // Enable the MPU
+    /*
+        The MPU_CTRL register:
+        - Enables the MPU
+        - Enables the default memory map background region
+        - Enables the use of the MPU whne in th hard fault, NMI, and FAULTMASK escalated handlers
+
+        PRIVDEFENA: When enabled, the background region acts as if it is region number -1.
+        ANY REGION THAT HAS BEEN DEFINED AND ENABLES HAS PRIORITY OVER THIS DEFAULT MAP
+
+        ENABLE: Enables the MPU
+
+     */
+    NVIC_MPU_CTRL_R |= NVIC_MPU_CTRL_PRIVDEFEN | NVIC_MPU_CTRL_ENABLE;
 }
