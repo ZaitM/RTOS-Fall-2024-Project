@@ -15,11 +15,13 @@
 #include <stdint.h>
 #include "tm4c123gh6pm.h"
 #include "shell.h"
-#include "shell_auxiliary.h"
-#include "shell_commands.h"
 #include "CortexM4Registers.h"
 
 // REQUIRED: Add header files here for your strings functions, ...
+#include "shell_auxiliary.h"
+#include "shell_commands.h"
+
+#define RED_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC - 0x40000000) * 32 + 1 * 4)))
 
 //-----------------------------------------------------------------------------
 // Subroutines
