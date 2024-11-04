@@ -300,10 +300,10 @@ void allowFlashAccess(void)
     NVIC_MPU_NUMBER_R = 6;
     // Set the base address to the start of the flash memory
     NVIC_MPU_BASE_R = 0x00000000;
-    // Set the region size to 256Kb
+    // Set the region size to 256 KiB
     NVIC_MPU_ATTR_R |= 0b10001 << 1;
     // Set the region to RWX
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
     // Enable the region
     NVIC_MPU_ATTR_R |= 0b1 << 0;
 }
@@ -321,10 +321,10 @@ void allowPeripheralAccess(void)
     NVIC_MPU_NUMBER_R = 5;
     // Set the base address to the start of the peripherals
     NVIC_MPU_BASE_R = 0x40000000;
-    // Set the region size to 64 MB
+    // Set the region size to 64 MiB
     NVIC_MPU_ATTR_R |= 25 << 1;
     // Set the region to be rw
-    NVIC_MPU_ATTR_R |= 0b011 << 24;
+    NVIC_MPU_ATTR_R |= FULL_ACCESS << 24;
     // Set the Ins fetches to disable
     NVIC_MPU_ATTR_R |= 0b001 << 28;
     // Enable the region
@@ -447,6 +447,11 @@ uint64_t createNoSramAccessMask(void)
 void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_in_bytes)
 {
     /*
+        IMPORTANT:
+        Disabling a subregion means another region overlapping the disabled range
+        matches instead
+    *
+    /*
         Create a function that adds access to the
         requested SRAM address range
 
@@ -496,7 +501,7 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
             return;
         }
     }
-    else    // Base region is R1 or R2
+    else // Base region is R1 or R2
     {
         switch (size_in_bytes)
         {
@@ -535,8 +540,6 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
     // Does not overflow because of the assumption that the programmer does not surpass the subregion disable bits
     mask <<= startSubregion;
 
-
-
     // Step 4: Apply the mask to the SRD bit mask based on the base region
     switch (baseRegion)
     {
@@ -571,8 +574,10 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
 void applySramAccessMask(uint64_t srdBitMask)
 {
     /*
-    What the region number is and set the
-*/
+        - Enabling the subregions according to the SRD bit mask.
+        - By enabling the subregions we are adding RW access to
+        unprivileged mode
+    */
     // example
     NVIC_MPU_NUMBER_R = 0;
     // Zero out SRD bits Easier to convert the SRDBITMASK
