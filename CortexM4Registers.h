@@ -21,7 +21,7 @@ extern void setPSP(uint32_t value);
  * Get the value of the PSP register
  * @return uint32_t
  */
-extern uint32_t getPSP(void);
+extern uint32_t *getPSP(void);
 
 /**
  * @brief
