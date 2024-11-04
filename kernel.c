@@ -41,16 +41,16 @@ typedef struct _semaphore
 semaphore semaphores[MAX_SEMAPHORES];
 
 // task states
-#define STATE_INVALID           0 // no task
-#define STATE_STOPPED           1 // stopped, all memory freed
-#define STATE_READY             2 // has run, can resume at any time
-#define STATE_DELAYED           3 // has run, but now awaiting timer
-#define STATE_BLOCKED_MUTEX     4 // has run, but now blocked by semaphore
+#define STATE_INVALID 0           // no task
+#define STATE_STOPPED 1           // stopped, all memory freed
+#define STATE_READY 2             // has run, can resume at any time
+#define STATE_DELAYED 3           // has run, but now awaiting timer
+#define STATE_BLOCKED_MUTEX 4     // has run, but now blocked by semaphore
 #define STATE_BLOCKED_SEMAPHORE 5 // has run, but now blocked by semaphore
 
 // task
-uint8_t taskCurrent = 0;          // index of last dispatched task
-uint8_t taskCount = 0;            // total number of valid tasks
+uint8_t taskCurrent = 0; // index of last dispatched task
+uint8_t taskCount = 0;   // total number of valid tasks
 
 // control
 bool priorityScheduler = true;    // priority (true) or round-robin (false)
@@ -58,20 +58,20 @@ bool priorityInheritance = false; // priority inheritance for mutexes
 bool preemption = false;          // preemption (true) or cooperative (false)
 
 // tcb
-#define NUM_PRIORITIES   16
+#define NUM_PRIORITIES 16
 struct _tcb
 {
-    uint8_t state;                 // see STATE_ values above
-    void *pid;                     // used to uniquely identify thread (add of task fn)
-    void *spInit;                  // original top of stack
-    void *sp;                      // current stack pointer
-    uint8_t priority;              // 0=highest
-    uint8_t currentPriority;       // 0=highest (needed for pi)
-    uint32_t ticks;                // ticks until sleep complete
-    uint64_t srd;                  // MPU subregion disable bits
-    char name[16];                 // name of task used in ps command
-    uint8_t mutex;                 // index of the mutex in use or blocking the thread
-    uint8_t semaphore;             // index of the semaphore that is blocking the thread
+    uint8_t state;           // see STATE_ values above
+    void *pid;               // used to uniquely identify thread (add of task fn)
+    void *spInit;            // original top of stack
+    void *sp;                // current stack pointer
+    uint8_t priority;        // 0=highest
+    uint8_t currentPriority; // 0=highest (needed for pi)
+    uint32_t ticks;          // ticks until sleep complete
+    uint64_t srd;            // MPU subregion disable bits
+    char name[16];           // name of task used in ps command
+    uint8_t mutex;           // index of the mutex in use or blocking the thread
+    uint8_t semaphore;       // index of the semaphore that is blocking the thread
 } tcb[MAX_TASKS];
 
 //-----------------------------------------------------------------------------
@@ -151,13 +151,16 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
         // make sure fn not already in list (prevent reentrancy)
         while (!found && (i < MAX_TASKS))
         {
-            found = (tcb[i++].pid ==  fn);
+            found = (tcb[i++].pid == fn);
         }
         if (!found)
         {
             // find first available tcb record
             i = 0;
-            while (tcb[i].state != STATE_INVALID) {i++;}
+            while (tcb[i].state != STATE_INVALID)
+            {
+                i++;
+            }
             tcb[i].state = STATE_READY;
             tcb[i].pid = fn;
             tcb[i].sp = 0;
@@ -230,6 +233,11 @@ void systickIsr(void)
 // REQUIRED: process UNRUN and READY tasks differently
 void pendSvIsr(void)
 {
+    putsUart0("Pendsv in process N\n");
+    putsUart0("Called from the MPU\n\n");
+    while (true)
+    {
+    };
 }
 
 // REQUIRED: modify this function to add support for the service call
@@ -237,4 +245,3 @@ void pendSvIsr(void)
 void svCallIsr(void)
 {
 }
-
