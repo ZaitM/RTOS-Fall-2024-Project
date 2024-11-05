@@ -36,7 +36,11 @@ VECTKEY_SYSRESETREQ_MASK .field 0x05FA0004
 ;    ldr r1, [r0]
 ;    isb
 ;    bx lr
+
 ;******************************************************************************** 
+; @brief
+; Set the ASP bit in the CONTROL register
+; so that the thread code uses the PSP stack
 	.def setASP
 setASP:
     mrs    r0, control  ; Read the control register
@@ -45,6 +49,8 @@ setASP:
     isb
     bx      lr
 
+; @brief
+; Sets the PSP register to the value passed as an argument
     .def setPSP
 setPSP:
     msr psp, r0
@@ -60,29 +66,46 @@ setTMPL:
     isb
     bx      lr
 
+;******************************************************************************** 
+; @brief
+; Gets the value of the PSP register
+; @return uint32_t
     .def getPSP
 getPSP:
     mrs r0, psp
     bx lr
 
+; @brief
+; Get the value of the MSP register
     .def getMSP
 getMSP:
     mrs r0, msp
     bx lr
 
+; @brief
+; Get the value of the PC register
     .def getPC
 getPC:
     mov r0, pc
     bx lr
 
+; @brief
+; Get the value of the xPSR register
+; Process status register
+; @return uint32_t
     .def getxPSR
 getxPSR:
     mrs r0, apsr
     bx lr
 
-
 ;******************************************************************************** 
-
+; @brief
+; Enables the bus fault handler in SHCSR
+; Set bit 17 in the SHCR
+;
+; A bus fault is an exception that occurs
+; because of a memory-related fault for an instruction or data memory transaction.
+; such as a prefetch fault or a memory access fault.
     .def enableBusFault
 enableBusFault:
     ldr r1, SHCSR      ; Load the adress of the System Handler Control Status Register
@@ -93,12 +116,18 @@ enableBusFault:
 
     bx lr;
 
+; @brief
+; This function will cause a bus fault exception.
+; Especifically it causes and set the Precise data bus error bit
+; in the configurable fault status register.
     .def causeBusFault
 causeBusFault:
     ldr r1, RESERVED   ; Load the address of the reserved register
     ldr r0, [r1]       ; Load the value of the reserved register
-;******************************************************************************** 
 
+;******************************************************************************** 
+; @brief
+; Set bit 18 in the SHCR
     .def enableUsageFault
 enableUsageFault:
     ldr r1, SHCSR   ; Load the adress of the System Handler Control Status Register
@@ -108,6 +137,9 @@ enableUsageFault:
 
     bx lr;
 
+; @brief Set the Div0 Trap object
+; Bit 4 in the configuration and control register (CCR) in ARM documentation
+; sets the divide by zero trap.
     .def setDiv0Trap 
 setDiv0Trap:
     ldr r1, CCR         ; Read the addres of the configuration control register
@@ -116,7 +148,11 @@ setDiv0Trap:
     str r2, [r1]        ; Write the div0 mask in the configuration control register
     bx lr
 
-    
+;@brief
+; This function will cause a usage fault exception.
+; It is vector number 6 with a an address of 0x00000018
+; Usage Fault Status (UFAULTSTAT 31:16) bit name DIV0 (bit # 25) it
+; is a subregister of the Configurable Fault Status Register.
 	.def causeUsageFault
 causeUsageFault:
     mov r0, #0x0 
@@ -124,18 +160,22 @@ causeUsageFault:
     udiv r1, r1, #0x0
 
     bx lr
+
 ;********************************************************************************
+; @brief Enables the MemManage fault handler in SHCSR
     .def enableMPUHandler
 enableMPUHandler:
-    ldr r1, SHCSR   ; Load the adress of the System Handler Control Status Register
-    ldr r0, [r1]    ; Load the value of the SHCSR into R2
-    orr r0, r0, #0x00010000; Set the bit in the prior register    
-    str r0, [r1]    ; Dereference SCHSR and store the the value of R2
+    ldr r1, SHCSR           ; Load the adress of the System Handler Control Status Register
+    ldr r0, [r1]            ; Load the value of the SHCSR into R2
+    orr r0, r0, #0x00010000 ; Set the bit in the prior register    
+    str r0, [r1]            ; Dereference SCHSR and store the the value of R2
 
     bx lr
 
+; @brief
+; This fault is used to to abort instruction access to Execute Never (XN) memory
+; regions, even if the MPU is disabled.  .
     .def causeMemFault
-
 causeMemFault:
     ldr r0, XN
     mov r1, r0
