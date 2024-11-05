@@ -51,6 +51,15 @@ setPSP:
     isb
     bx lr
 
+; Sets the thread mode privilege level
+	.def setTMPL
+setTMPL:
+    mrs    r0, control  ; Read the control register
+    orr    r0, r0, #1   ; Set to unprivilieged mode
+    msr     control, r0 ; Write the modified value back to the control register
+    isb
+    bx      lr
+
     .def getPSP
 getPSP:
     mrs r0, psp
@@ -133,11 +142,3 @@ causeMemFault:
 
     bx r1
 
-; Defines the Thread mode privilege level
-	.def setTMPL
-setTMPL:
-    mrs    r0, control  ; Read the control register
-    orr    r0, r0, #1   ; Set to unprivilieged mode
-    msr     control, r0 ; Write the modified value back to the control register
-    isb
-    bx      lr
