@@ -64,6 +64,8 @@ extern void busFaultIsr(void);
 extern void usageFaultIsr(void);
 extern void pendSvIsr(void);
 
+extern void svCallIsr(void);
+
 //*****************************************************************************
 //
 // The vector table.  Note that the proper constructs must be placed on this to
@@ -86,7 +88,7 @@ void (*const g_pfnVectors[])(void) =
         0,                 // Reserved
         0,                 // Reserved
         0,                 // Reserved
-        IntDefaultHandler, // SVCall handler
+        svCallIsr,         // SVCall handler
         IntDefaultHandler, // Debug monitor handler
         0,                 // Reserved
         pendSvIsr,         // The PendSV handler
