@@ -18,6 +18,32 @@
 #include "kernel.h"
 
 //-----------------------------------------------------------------------------
+// Device includes, defines, and assembler directives by programmer
+//-----------------------------------------------------------------------------
+#include "shell_auxiliary.h"
+#include "CortexM4Registers.h"
+#include "faults.h"
+#define EXC_RETURN_THREAD_PSP 0xFFFFFFFD
+
+#define SVC_START_R 0
+#define SVC_YIELD 1
+#define SVC_RESTART_T 2
+#define SVC_STOP_T 3
+#define SVC_SET_PRIORITY_T 4
+#define SVC_SLEEP 5
+#define SVC_LOCK 6
+#define SVC_UNLOCK 7
+#define SVC_WAIT 8
+#define SVC_POST 9
+
+/*
+    The PSR is a combination of the following:
+    - APSR: Application Program Status Register
+    - IPSR: Interrupt Program Status Register
+    - EPSR: Execution Program Status Register
+*/
+#define EPSR_THUMB_MASK (1 << 24)
+//-----------------------------------------------------------------------------
 // RTOS Defines and Kernel Variables
 //-----------------------------------------------------------------------------
 
@@ -102,14 +128,31 @@ bool initSemaphore(uint8_t semaphore, uint8_t count)
 void initRtos(void)
 {
     uint8_t i;
+
     // no tasks running
     taskCount = 0;
+
     // clear out tcb records
     for (i = 0; i < MAX_TASKS; i++)
     {
         tcb[i].state = STATE_INVALID;
         tcb[i].pid = 0;
     }
+
+    // Disable the SysTick timer
+    NVIC_ST_CTRL_R = 0;
+
+    // Set the clock source to the system clock
+    NVIC_ST_CTRL_R |= 0x00000004;
+
+    // Enables SysTick exception request
+    NVIC_ST_CTRL_R |= 0x00000002; // TICKINT
+
+    // Set the reload value
+    NVIC_ST_RELOAD_R = 40000 - 1;
+
+    // Enable the SysTick timer
+    NVIC_ST_CTRL_R |= 0x00000001;
 }
 
 // REQUIRED: Implement prioritization to NUM_PRIORITIES
@@ -128,17 +171,46 @@ uint8_t rtosScheduler(void)
     return task;
 }
 
+void launchTask()
+{
+    __asm(" SVC #0");
+}
 // REQUIRED: modify this function to start the operating system
 // by calling scheduler, set srd bits, setting PSP, ASP bit, call fn with fn add in R0
 // fn set TMPL bit, and PC <= fn
 void startRtos(void)
 {
+    /*
+        1. Call the scheduler
+        2. Setup the first task
+        3. Switch to privileged mode when launching the first task
+    */
+
+    // 1. Call the scheduler
+    //    taskCurrent = rtosScheduler();
+
+    // 3. Switch to privileged mode when launching the first task
+    setPSP(TOP_OF_HEAP);
+    setASP();
+    setTMPL();
+
+    launchTask();
+
+    /*
+        Do a svc according to nesotr
+    */
+    // applySramAccessMask(tcb[taskCurrent].srd);
+    // ptrToTask(); // Call the function
+    // 2. Set up the first task
+    //    void *taskPID = tcb[taskCurrent].pid; // pid member is of type void*
+    // _fn ptrToTask = tcb[taskCurrent].pid; // declare a function pointer. cast the pid to the function pointer
 }
 
 // REQUIRED:
 // add task if room in task list
 // store the thread name
 // allocate stack space and store top of stack in sp and spInit
+// spInit (Not required this semester 10/09/24)
 // set the srd bits based on the memory allocation
 // initialize the created stack to make it appear the thread has run before
 bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackBytes)
@@ -146,11 +218,14 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
     bool ok = false;
     uint8_t i = 0;
     bool found = false;
+
     if (taskCount < MAX_TASKS)
     {
         // make sure fn not already in list (prevent reentrancy)
         while (!found && (i < MAX_TASKS))
         {
+            // Gets the address of the function
+            // Double purpose. PID number and the address of the function
             found = (tcb[i++].pid == fn);
         }
         if (!found)
@@ -161,13 +236,69 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             {
                 i++;
             }
+
+            // 1. Create a void pointer. Preallocate memory for the thread
+            void *ptr = mallocFromHeap(stackBytes);
+
+            // 2. Store the thread name
+            strCopy(tcb[i].name, name);
+
             tcb[i].state = STATE_READY;
             tcb[i].pid = fn;
-            tcb[i].sp = 0;
-            tcb[i].spInit = 0;
+            // Adjust the sp to the top of the stack
+            tcb[i].sp = (void *)((uint32_t)ptr + stackBytes);
+            tcb[i].spInit = (void *)((uint32_t)ptr + stackBytes); // May not need this as mentioned in class
             tcb[i].priority = priority;
-            tcb[i].srd = 0;
+            tcb[i].srd = createNoSramAccessMask();
 
+            // 3.  Configure/Modify the srd bit mask
+            addSramAccessWindow(&tcb[i].srd, ptr, stackBytes);
+
+            // 4. Make the thread appea as if it has run before
+            uint32_t *psp = (uint32_t *)tcb[i].sp;
+
+            *(psp - 1) = EPSR_THUMB_MASK;       // Set the Thumb bit in the EPSR
+            *(psp - 2) = (uint32_t)tcb[i].pid;  // Set the PC to the function address
+            *(psp - 3) = EXC_RETURN_THREAD_PSP; // Set the LR to thread mode and use the PSP
+            *(psp - 4) = 0x00000000;            // Zero out R12
+            *(psp - 5) = 0x00000000;            // Zero out R3
+            *(psp - 6) = 0x00000000;            // Zero out R2
+            *(psp - 7) = 0x00000000;            // Zero out R1
+            *(psp - 8) = 0x00000000;            // Zero out R0
+            /*
+                Page 152 ARM Optimizing C/C++ Compiler User Guide:
+                Preserve any dedicated registers
+                - Save-on-reentry registers (R4-R11, LR)
+                - SP R13
+            */
+            // Simulate the pushing of the registers
+            *(psp - 9) = EXC_RETURN_THREAD_PSP; // Set the LR to thread mode and use the PSP
+            *(psp - 10) = 0x44444444;           // Zero out R11
+            *(psp - 11) = 0x00000000;           // Zero out R10
+            *(psp - 12) = 0x00000000;           // Zero out R9
+            *(psp - 13) = 0x00000000;           // Zero out R8
+            *(psp - 14) = 0x00000000;           // Zero out R7
+            *(psp - 15) = 0x00000000;           // Zero out R6
+            *(psp - 16) = 0x00000000;           // Zero out R5
+            *(psp - 17) = 0x00000000;           // Zero out R4 (Lowest numbered register using the lowest memory address)
+
+            psp -= 17; // Move the stack pointer to the next available memory location
+            tcb[i].sp = (void *)psp;
+            /*
+                Page 41 of the Cortex-M4 Generic User Guide
+
+                Exception return
+                Occurs when the processor is in handler mode and executes
+                one of the following instructions to load EXC_RETURN into the PC:
+                - LDM or POP with the PC in the list
+                - LDR with PC as the destination register
+                - BX instruction using any register
+
+                IMPORTANT:
+                EXC_RETURN is the value loaded on to LR on exception entry.
+                When it is loaded to PC it indicates to the processor that the
+                exception is complete.
+            */
             // increment task count
             taskCount++;
             ok = true;
@@ -195,12 +326,26 @@ void setThreadPriority(_fn fn, uint8_t priority)
 // REQUIRED: modify this function to yield execution back to scheduler using pendsv
 void yield(void)
 {
+    __asm(" SVC #1 "); // PC 0x00002328 -> DFFE
+                       // SP 0x20007FF8
 }
 
 // REQUIRED: modify this function to support 1ms system timer
 // execution yielded back to scheduler until time elapses using pendsv
 void sleep(uint32_t tick)
 {
+    /*
+        Will mark the task as delayed and save the context necessary
+        for resuming the task later.
+
+        The task is then delayed until a kernel determines that a
+        period of time_ms has expired.
+
+        Once the time has expired, the task that called sleep() will be
+        marked as ready so that the scheduler can resume the task later.
+    */
+
+    __asm(" SVC #5");
 }
 
 // REQUIRED: modify this function to lock a mutex using pendsv
@@ -227,21 +372,139 @@ void post(int8_t semaphore)
 // REQUIRED: in preemptive code, add code to request task switch
 void systickIsr(void)
 {
+    /*
+        For all tasks if delayed
+        - Decrement the ticks
+        - If the ticks are zero, mark the task as ready
+    */
+    uint8_t i;
+    for (i = 0; i < taskCount; i++)
+    {
+        if (tcb[i].state == STATE_DELAYED)
+        {
+            tcb[i].ticks--;
+            if (tcb[i].ticks == 0)
+            {
+                tcb[i].state = STATE_READY;
+            }
+        }
+    }
 }
 
 // REQUIRED: in coop and preemptive, modify this function to add support for task switching
 // REQUIRED: process UNRUN and READY tasks differently
-void pendSvIsr(void)
+__attribute__((naked)) void pendSvIsr(void)
 {
-    putsUart0("Pendsv in process N\n");
-    putsUart0("Called from the MPU\n\n");
-    while (true)
+    // ALL TASK SWITCHING WILL BE DONE HERE
+    /*
+        Step 7:
+        - Push registers
+        - Save psp
+        - Call the scheduler
+        - Restore psp
+        - Restore SRD bits
+        - Pop the registers to make a seamless transition aka task switch
+        Page 110 of the Cortex-M4 Generic User Guide -> Exception Stack Frame
+
+        From my notes on 10/22
+        - Push the registers on the stack (R4-R11)
+        - Call the scheduler
+        - Pop the registers from the stack (R4-R11)
+        - Set srd bits based on the memory allocation
+    */
+    /*
+        Page 97 of ARM Optimizing C/C++ Compiler User Guide
+
+        * __asm keyword is used to write inline assembly code in C/C++.
+          Embeds instructions or directives
+
+        * The naked attribute can be used to identify functions that are written as
+          embedded assembly functions.
+
+        * IMPORTANT: Page 132 of the ARM Optimizing C/C++ Compiler User Guide
+          The compiler does not generate prologue or epilogue sequences for naked functions t.
+    */
+
+    // clear the ierr bit and
+    if ((NVIC_FAULT_STAT_R & NVIC_FAULT_STAT_IERR == 1) || (NVIC_FAULT_STAT_R & NVIC_FAULT_STAT_DERR == 2))
     {
-    };
+        // clear bits
+        NVIC_FAULT_STAT_R |= NVIC_FAULT_STAT_IERR;
+        NVIC_FAULT_STAT_R |= NVIC_FAULT_STAT_DERR;
+    }
+
+    // push r4 r1
+    __asm(" mov r12, lr");
+    pushR4R11();
+
+    tcb[taskCurrent].sp = getPSP();
+    taskCurrent = rtosScheduler();
+    setPSP(tcb[taskCurrent].sp);
+    applySramAccessMask(tcb[taskCurrent].srd);
+
+    // Pop the registers from the stack (R4-R11)
+    popR4R11();
 }
 
-// REQUIRED: modify this function to add support for the service call
 // REQUIRED: in preemptive code, add code to handle synchronization primitives
 void svCallIsr(void)
 {
+    /*
+        Is an exception that is triggered by the SVC instruction.
+        In an OS environment applications can use SVC instructions to
+        access kernel functions and device drivers
+
+        *  Page 106 ARM Optimizing C/C++ Compiler User Guide:
+           Cortex-M architecutres, C SWI handlers cannot return values.
+    */
+    /*
+         - Will do switch case statement
+         - Unprivileged code can call SVC instructions to access kernel functions
+    */
+    uint32_t svcNum;
+    uint32_t *pc = getPSP();
+
+    svcNum = *(pc + 6);
+    svcNum -= 2;
+    svcNum = *(uint32_t *)svcNum & 0xFF;
+
+    switch (svcNum)
+    {
+    case SVC_START_R:
+        // Step 5: startRTOS() to call the scheduler and
+        // then switch to privileged mode when launching the first task
+        taskCurrent = rtosScheduler();
+        applySramAccessMask(tcb[taskCurrent].srd);
+        setPSP(tcb[taskCurrent].sp);
+        popR4R11();
+
+        break;
+
+    case SVC_YIELD:
+        setPendSV();
+        break;
+
+    case SVC_SLEEP:
+        /*
+            - Set state to delayed
+            - Set the ticks
+            - pendSV
+        */
+        tcb[taskCurrent].ticks = *(getPSP()); // Set the ticks
+        tcb[taskCurrent].state = STATE_DELAYED;
+        setPendSV();
+        break;
+
+    default:
+        break;
+    }
 }
+
+//-----------------------------------------------------------------------------
+// Glossary
+//-----------------------------------------------------------------------------
+/*
+    Reentrant:
+    A function that can be interrupted in the middle of its execution
+    Can be called again before the previous call is completed
+*/
