@@ -182,3 +182,24 @@ causeMemFault:
 
     bx r1
 
+;********************************************************************************
+    .def pushR4R11
+pushR4R11:
+    mrs r0, psp
+    stmdb r0!, {r4-r12}  ; pushing data onto a Full Descending stack
+                        ; (pg 79 ARM Cortex-M4 Generic User Guide)
+
+    msr psp, r0
+    bx lr
+
+    .def popR4R11
+popR4R11:
+	mrs r0, psp
+    ldmia r0!, {r4-r11, lr} ; popping data from a Full Descending stack
+                        ; (pg 79 ARM Cortex-M4 Generic User Guide)
+                        ; '!' the final address that is loaded is written back to the base
+                        ; register
+
+    msr psp, r0
+    bx lr
+
