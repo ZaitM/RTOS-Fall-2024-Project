@@ -12,3 +12,6 @@ Debug/
 .settings/
 targetConfigs/
 *.txt
+scratch-code.c
+.launches/
+.vscode/launch.json
