@@ -15,7 +15,11 @@
 #include <stdint.h>
 #include "tm4c123gh6pm.h"
 #include "mm.h"
+//-----------------------------------------------------------------------------
+// Device includes, defines, and assembler directives by programmer
+//-----------------------------------------------------------------------------
 #include "shell_auxiliary.h"
+#include "CortexM4Registers.h"
 
 //-----------------------------------------------------------------------------
 // Global variables
@@ -50,59 +54,61 @@ void *allocate_from_subregion(uint32_t size)
     uint32_t j = 0, eightKregionIdx = 1, fourKregionIdx = 0;
 
     void *ptrSubRegion = NULL;
-
-    // First check 1KB sections
-    for (eightKregionIdx; eightKregionIdx <= TOTAL_8K_REGIONS; eightKregionIdx++)
+    if (size > BLOCK_512)
     {
-        // Once we have allocated exit and don't check the other regions
-        if (remainingSize <= 0)
-            break;
-
-        uint32_t sectionIdx = 0;
-
-        for (sectionIdx; sectionIdx <= SUBREGIONS_PER_REGION; sectionIdx++)
+        // First check 1KB sections
+        for (eightKregionIdx; eightKregionIdx <= TOTAL_8K_REGIONS; eightKregionIdx++)
         {
-            // Once we have allocated exit
-            if (!remainingSize)
+            // Once we have allocated exit and don't check the other regions
+            if (remainingSize <= 0)
                 break;
 
-            /*
-                Sweep
-                For each needed section check if the section is allocated
-            */
+            uint32_t sectionIdx = 0;
 
-            for (j = 0; j < neededSections; j++)
+            for (sectionIdx; sectionIdx <= SUBREGIONS_PER_REGION; sectionIdx++)
             {
-                /*
-                    If the section is
-                    - allocated
-                    - or the remaining size is 0
-                    - or the section index is out of bounds
-                    then break
-                */
-                if (regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
+                // Once we have allocated exit
+                if (!remainingSize)
                     break;
 
-                else
+                /*
+                    Sweep
+                    For each needed section check if the section is allocated
+                */
+
+                for (j = 0; j < neededSections; j++)
                 {
-                    if (ptrSubRegion == NULL)
-                    {
-                        ptrSubRegion = regions[eightKregionIdx].baseAddress + sectionIdx * BLOCK_1024;
-                        regions[eightKregionIdx].sizeOfAllocations[sectionIdx] = size;
-                    }
-
-                    regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] = ALLOCATED;
-                    remainingSize -= BLOCK_1024;
-
                     /*
-                        If we ran out of space in the 8K region
-                        check if there is space in the following
-                        4K region and set the 4K region index to R3
-
-                        IF the first index of the 4K region is not allocated
-                        then we can allocate in that region
+                        If the section is
+                        - allocated
+                        - or the remaining size is 0
+                        - or the section index is out of bounds
+                        then break
                     */
-                    fourKregionIdx = regions[R3_IDX].subRegionAllocated[0] == FREE ? R3_IDX : R0_IDX;
+                    if (regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] == ALLOCATED || remainingSize == FREE || (sectionIdx + j) >= SUBREGIONS_PER_REGION)
+                        break;
+
+                    else
+                    {
+                        if (ptrSubRegion == NULL)
+                        {
+                            ptrSubRegion = regions[eightKregionIdx].baseAddress + sectionIdx * BLOCK_1024;
+                            regions[eightKregionIdx].sizeOfAllocations[sectionIdx] = size;
+                        }
+
+                        regions[eightKregionIdx].subRegionAllocated[sectionIdx + j] = ALLOCATED;
+                        remainingSize -= BLOCK_1024;
+
+                        /*
+                            If we ran out of space in the 8K region
+                            check if there is space in the following
+                            4K region and set the 4K region index to R3
+
+                            IF the first index of the 4K region is not allocated
+                            then we can allocate in that region
+                        */
+                        fourKregionIdx = regions[R3_IDX].subRegionAllocated[0] == FREE ? R3_IDX : R0_IDX;
+                    }
                 }
             }
         }
@@ -605,6 +611,10 @@ void applySramAccessMask(uint64_t srdBitMask)
     NVIC_MPU_ATTR_R |= (((srdBitMask >> 32) & 0xFF) << 8);
 }
 
+/**
+ * @brief
+ * Enable the MPU
+ */
 void enableMPU(void)
 {
     // Enable the MPU
