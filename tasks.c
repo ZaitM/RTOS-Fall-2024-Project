@@ -20,11 +20,11 @@
 #include "kernel.h"
 #include "tasks.h"
 
-#define BLUE_LED   PORTF,2 // on-board blue LED
-#define RED_LED    PORTE,0 // off-board red LED
-#define ORANGE_LED PORTA,2 // off-board orange LED
-#define YELLOW_LED PORTA,3 // off-board yellow LED
-#define GREEN_LED  PORTA,4 // off-board green LED
+#define RED_LED PORTE, 0    // off-board red LED
+#define ORANGE_LED PORTA, 2 // off-board orange LED
+#define YELLOW_LED PORTA, 3 // off-board yellow LED
+#define GREEN_LED PORTA, 4  // off-board green LED
+#define BLUE_LED PORTF, 2   // on-board blue LED
 
 //-----------------------------------------------------------------------------
 // Subroutines
@@ -35,7 +35,37 @@
 //           Add initialization for 6 pushbuttons
 void initHw(void)
 {
-    // Setup LEDs and pushbuttons
+    // Setup LEDs
+    enablePort(PORTA);
+    enablePort(PORTE);
+    enablePort(PORTF);
+    selectPinPushPullOutput(RED_LED);
+    selectPinPushPullOutput(ORANGE_LED);
+    selectPinPushPullOutput(YELLOW_LED);
+    selectPinPushPullOutput(GREEN_LED);
+    selectPinPushPullOutput(BLUE_LED);
+
+    // Setup RGB LED
+    selectPinPushPullOutput(PORTF, 1); // RED 
+    selectPinPushPullOutput(PORTF, 2); // BLUE 
+    selectPinPushPullOutput(PORTF, 3); // GREEN 
+
+    // Setup pushbuttons
+    enablePort(PORTC);
+    enablePort(PORTD);
+    selectPinDigitalInput(PORTC, 4); // 0x10
+    selectPinDigitalInput(PORTC, 5); // 0x20
+    selectPinDigitalInput(PORTC, 6); // 0x40
+    selectPinDigitalInput(PORTC, 7); // 0x80
+    selectPinDigitalInput(PORTD, 6); // 0x40
+    setPinCommitControl(PORTD, 7);   // 0x80
+    selectPinDigitalInput(PORTD, 7); // 0x80
+    enablePinPullup(PORTC, 4);
+    enablePinPullup(PORTC, 5);
+    enablePinPullup(PORTC, 6);
+    enablePinPullup(PORTC, 7);
+    enablePinPullup(PORTD, 6);
+    enablePinPullup(PORTD, 7);
 
     // Power-up flash
     setPinValue(GREEN_LED, 1);
@@ -47,25 +77,42 @@ void initHw(void)
 // REQUIRED: add code to return a value from 0-63 indicating which of 6 PBs are pressed
 uint8_t readPbs(void)
 {
-    return 0;
+    uint8_t pbValues = 0;
+
+    pbValues = ~(getPortValue(PORTC) >> 4) & 0x0F;
+    pbValues = ~(getPortValue(PORTD) >> 2) & 0x30;
+
+    return pbValues;
 }
 
 // one task must be ready at all times or the scheduler will fail
 // the idle task is implemented for this purpose
 void idle(void)
 {
-    while(true)
+    while (true)
     {
-        setPinValue(ORANGE_LED, 1);
+        setPinValue(GREEN_LED, 1);
         waitMicrosecond(1000);
-        setPinValue(ORANGE_LED, 0);
+        setPinValue(GREEN_LED, 0);
+//        sleep(1000);
         yield();
     }
 }
 
+void idle2(void)
+{
+    while (true)
+    {
+        setPinValue(BLUE_LED, 1);
+        waitMicrosecond(1000);
+        setPinValue(BLUE_LED, 0);
+        //sleep(1000);
+        yield();
+    }
+}
 void flash4Hz(void)
 {
-    while(true)
+    while (true)
     {
         setPinValue(GREEN_LED, !getPinValue(GREEN_LED));
         sleep(125);
@@ -74,7 +121,7 @@ void flash4Hz(void)
 
 void oneshot(void)
 {
-    while(true)
+    while (true)
     {
         wait(flashReq);
         setPinValue(YELLOW_LED, 1);
@@ -96,7 +143,7 @@ void lengthyFn(void)
     uint16_t i;
     uint8_t *mem;
     mem = mallocFromHeap(5000 * sizeof(uint8_t));
-    while(true)
+    while (true)
     {
         lock(resource);
         for (i = 0; i < 5000; i++)
@@ -112,7 +159,7 @@ void lengthyFn(void)
 void readKeys(void)
 {
     uint8_t buttons;
-    while(true)
+    while (true)
     {
         wait(keyReleased);
         buttons = 0;
@@ -151,7 +198,7 @@ void readKeys(void)
 void debounce(void)
 {
     uint8_t count;
-    while(true)
+    while (true)
     {
         wait(keyPressed);
         count = 10;
@@ -169,7 +216,7 @@ void debounce(void)
 
 void uncooperative(void)
 {
-    while(true)
+    while (true)
     {
         while (readPbs() == 8)
         {
@@ -180,8 +227,8 @@ void uncooperative(void)
 
 void errant(void)
 {
-    uint32_t* p = (uint32_t*)0x20000000;
-    while(true)
+    uint32_t *p = (uint32_t *)0x20000000;
+    while (true)
     {
         while (readPbs() == 32)
         {
@@ -193,7 +240,7 @@ void errant(void)
 
 void important(void)
 {
-    while(true)
+    while (true)
     {
         lock(resource);
         setPinValue(BLUE_LED, 1);
