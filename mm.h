@@ -15,7 +15,7 @@
 
 #define NUM_SRAM_REGIONS 5
 
-#define PSP_BASE 0x20008000
+#define TOP_OF_HEAP 0x20008000
 #define HEAP_START 0x20001000 // Marks the start of the heap
 #define HEAP_END 0x20007FFF   // Marks the end of the heap.
 
