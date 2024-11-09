@@ -23,7 +23,7 @@
 //-----------------------------------------------------------------------------
 
 // function pointer
-typedef void (*_fn)();
+typedef void (*_fn)();  // Returns void, pointer to function, no parameters
 
 // mutex
 #define MAX_MUTEXES 1
@@ -63,7 +63,13 @@ void wait(int8_t semaphore);
 void post(int8_t semaphore);
 
 void systickIsr(void);
-void pendSvIsr(void);
-void svCallIsr(void);
+void pendSvIsr(void);   // This functions takes care of the context switching
+void svCallIsr(void);   // This function takes care of the SVC calls
+
+//-----------------------------------------------------------------------------
+// Subroutines by programmer
+//-----------------------------------------------------------------------------
+void launchTask(void);
+void initSysTick(void); // Initialize the system timer to 100 ms
 
 #endif
