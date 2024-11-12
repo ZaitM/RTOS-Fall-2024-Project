@@ -21,5 +21,7 @@ void mpuFaultIsr(void);
 void hardFaultIsr(void);
 void busFaultIsr(void);
 void usageFaultIsr(void);
+void pendSVIsr(void);
 
+void setPendSV(void);
 #endif
