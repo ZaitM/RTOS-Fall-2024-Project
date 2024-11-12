@@ -21,9 +21,9 @@ CFSR        .field 0xE000ED28   ; Control Fault Status Register * Byte accessibl
 UFSR        .field 0xE000ED2A   ; Usage Fault Status Register   * Executed a divide by zero
 
 
-SHCSR_EN_MASK    .field 0x00040000   ; Usage Fault Enable Mask
-VECTKEY_MASK:     .field 0x05FA        ; Key to unlock the AIRCR register
-SYSRESETREQ_MASK: .field 0x00000004   ; System Reset Request Mask
+SHCSR_EN_MASK    .field 0x00040000      ; Usage Fault Enable Mask
+VECTKEY_MASK:     .field 0x05FA         ; Key to unlock the AIRCR register
+SYSRESETREQ_MASK: .field 0x00000004     ; System Reset Request Mask
 VECTKEY_SYSRESETREQ_MASK .field 0x05FA0004
 
 ;    .def reboot
@@ -44,7 +44,7 @@ VECTKEY_SYSRESETREQ_MASK .field 0x05FA0004
 	.def setASP
 setASP:
     mrs    r0, control  ; Read the control register
-    orr    r0, r0, #2   ; Modify (Set) the ASP bit
+    orr    r0, r0, #2   ; Modify (Set) the ASP bit (BIT 1)
     msr     control, r0 ; Write the modified value back to the control register
     isb
     bx      lr
@@ -61,7 +61,7 @@ setPSP:
 	.def setTMPL
 setTMPL:
     mrs    r0, control  ; Read the control register
-    orr    r0, r0, #1   ; Set to unprivilieged mode
+    orr    r0, r0, #1   ; Set to unprivilieged mode (BIT 0)
     msr     control, r0 ; Write the modified value back to the control register
     isb
     bx      lr
@@ -108,11 +108,11 @@ getxPSR:
 ; such as a prefetch fault or a memory access fault.
     .def enableBusFault
 enableBusFault:
-    ldr r1, SHCSR      ; Load the adress of the System Handler Control Status Register
-    ldr r0, [r1]       ; Load the value of the SHCSR into R0
-    orr r0, r0, #0x00020000; Set the bit in the prior register
-    str r0, [r1]       ; Dereference SCHSR and store the the value of R2
-    ; ldr r0, [r1]     ; Read the value of SCHSR into R0
+    ldr r1, SHCSR           ; Load the adress of the System Handler Control Status Register
+    ldr r0, [r1]            ; Load the value of the SHCSR into R0
+    orr r0, r0, #0x00020000 ; Set the bit in the prior register
+    str r0, [r1]            ; Dereference SCHSR and store the the value of R2
+    ; ldr r0, [r1]          ; Read the value of SCHSR into R0
 
     bx lr;
 
@@ -130,10 +130,10 @@ causeBusFault:
 ; Set bit 18 in the SHCR
     .def enableUsageFault
 enableUsageFault:
-    ldr r1, SHCSR   ; Load the adress of the System Handler Control Status Register
-    ldr r0, [r1]    ; Load the value of the SHCSR into R2
-    orr r0, r0, #0x00040000; Set the bit in the prior register
-    str r0, [r1]    ; Dereference SCHSR and store the the value of R2
+    ldr r1, SHCSR           ; Load the adress of the System Handler Control Status Register
+    ldr r0, [r1]            ; Load the value of the SHCSR into R2
+    orr r0, r0, #0x00040000 ; Set the bit in the prior register
+    str r0, [r1]            ; Dereference SCHSR and store the the value of R2
 
     bx lr;
 
@@ -186,9 +186,8 @@ causeMemFault:
     .def pushR4R11
 pushR4R11:
     mrs r0, psp
-    stmdb r0!, {r4-r12}  ; pushing data onto a Full Descending stack
-                        ; (pg 79 ARM Cortex-M4 Generic User Guide)
-
+    stmdb r0!, {r4-r12}     ; pushing data onto a Full Descending stack
+                            ; (pg 79 ARM Cortex-M4 Generic User Guide)
     msr psp, r0
     bx lr
 
@@ -196,10 +195,9 @@ pushR4R11:
 popR4R11:
 	mrs r0, psp
     ldmia r0!, {r4-r11, lr} ; popping data from a Full Descending stack
-                        ; (pg 79 ARM Cortex-M4 Generic User Guide)
-                        ; '!' the final address that is loaded is written back to the base
-                        ; register
-
+                            ; (pg 79 ARM Cortex-M4 Generic User Guide)
+                            ; '!' the final address that is loaded is written back to the base
+                            ; register
     msr psp, r0
     bx lr
 
