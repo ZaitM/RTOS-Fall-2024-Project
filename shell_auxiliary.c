@@ -187,7 +187,7 @@ void itoa(uint32_t value, char str[], uint8_t base)
  * @param str1
  * @param str2
  */
-void strCopy(char *dstStr, char *srcStr)
+void strCopy(char *dstStr, const char *srcStr)
 {
     uint8_t i = 0;
     while (srcStr[i] != NULL)
