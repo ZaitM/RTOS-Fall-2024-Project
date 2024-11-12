@@ -25,16 +25,16 @@
 #include "faults.h"
 #define EXC_RETURN_THREAD_PSP 0xFFFFFFFD
 
-#define SVC_START_R 0
-#define SVC_YIELD 1
-#define SVC_RESTART_T 2
-#define SVC_STOP_T 3
-#define SVC_SET_PRIORITY_T 4
-#define SVC_SLEEP 5
-#define SVC_LOCK 6
-#define SVC_UNLOCK 7
-#define SVC_WAIT 8
-#define SVC_POST 9
+#define SVC_START_R         0
+#define SVC_YIELD           1
+#define SVC_RESTART_T       2
+#define SVC_STOP_T          3
+#define SVC_SET_PRIORITY_T  4
+#define SVC_SLEEP           5
+#define SVC_LOCK            6
+#define SVC_UNLOCK          7
+#define SVC_WAIT            8
+#define SVC_POST            9
 
 /*
     The PSR is a combination of the following:
@@ -180,27 +180,11 @@ void launchTask()
 // fn set TMPL bit, and PC <= fn
 void startRtos(void)
 {
-    /*
-        1. Call the scheduler
-        2. Setup the first task
-        3. Switch to privileged mode when launching the first task
-    */
-
-    // 3. Switch to privileged mode when launching the first task
     setPSP(TOP_OF_HEAP);
     setASP();
     setTMPL();
 
-    launchTask();
-
-    /*
-        Do a svc according to nesotr
-    */
-    // applySramAccessMask(tcb[taskCurrent].srd);
-    // ptrToTask(); // Call the function
-    // 2. Set up the first task
-    //    void *taskPID = tcb[taskCurrent].pid; // pid member is of type void*
-    // _fn ptrToTask = tcb[taskCurrent].pid; // declare a function pointer. cast the pid to the function pointer
+    launchTask();   // Does a service call (Goes to privileged mode)
 }
 
 // REQUIRED:
@@ -360,11 +344,13 @@ void unlock(int8_t mutex)
 // REQUIRED: modify this function to wait a semaphore using pendsv
 void wait(int8_t semaphore)
 {
+    __asm(" SVC #8");
 }
 
 // REQUIRED: modify this function to signal a semaphore is available using pendsv
 void post(int8_t semaphore)
 {
+    __asm(" SVC #9");
 }
 
 // REQUIRED: modify this function to add support for the system timer
@@ -430,8 +416,8 @@ __attribute__((naked)) void pendSvIsr(void)
     if ((NVIC_FAULT_STAT_R & NVIC_FAULT_STAT_IERR == 1) || (NVIC_FAULT_STAT_R & NVIC_FAULT_STAT_DERR == 2))
     {
         // clear bits
-        NVIC_FAULT_STAT_R |= NVIC_FAULT_STAT_IERR;
-        NVIC_FAULT_STAT_R |= NVIC_FAULT_STAT_DERR;
+        NVIC_FAULT_STAT_R &= ~NVIC_FAULT_STAT_IERR;
+        NVIC_FAULT_STAT_R &= ~NVIC_FAULT_STAT_DERR;
     }
 
     __asm(" mov r12, lr");
@@ -495,8 +481,10 @@ void svCallIsr(void)
         */
         tcb[taskCurrent].ticks = *(getPSP()); // Set the ticks
         tcb[taskCurrent].state = STATE_DELAYED;
-        setPendSV();
+
+        setPendSV(); // Does the task switching
         break;
+
     case SVC_LOCK:
         /*
             - Locks the mutex
@@ -516,8 +504,10 @@ void svCallIsr(void)
             mutexes[0].processQueue[mutexes[0].queueSize] = taskCurrent; // The processQueue is up to 2 tasks
             mutexes[0].queueSize++;
         }
-        setPendSV();
+
+        setPendSV(); // Does the task switching
         break;
+
     case SVC_UNLOCK:
         /*
             - Only the thread that locked the mutex can unlock it
@@ -543,10 +533,16 @@ void svCallIsr(void)
                 mutexes[0].queueSize--; // Decrement the queue size
             }
         }
-
-
         // TBD: else -> delete the thread
+
         break;
+    case SVC_WAIT:
+        setPendSV();
+        break;
+
+    case SVC_POST:
+        break;
+
     default:
         break;
     }
