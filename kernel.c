@@ -143,16 +143,16 @@ void initRtos(void)
     NVIC_ST_CTRL_R = 0;
 
     // Set the clock source to the system clock
-    NVIC_ST_CTRL_R |= 0x00000004;
+    NVIC_ST_CTRL_R |= NVIC_ST_CTRL_CLK_SRC;
 
     // Enables SysTick exception request
-    NVIC_ST_CTRL_R |= 0x00000002; // TICKINT
+    NVIC_ST_CTRL_R |= NVIC_ST_CTRL_INTEN; // TICKINT
 
     // Set the reload value
     NVIC_ST_RELOAD_R = 40000 - 1;
 
     // Enable the SysTick timer
-    NVIC_ST_CTRL_R |= 0x00000001;
+    NVIC_ST_CTRL_R |= NVIC_ST_CTRL_ENABLE;
 }
 
 // REQUIRED: Implement prioritization to NUM_PRIORITIES
@@ -185,9 +185,6 @@ void startRtos(void)
         2. Setup the first task
         3. Switch to privileged mode when launching the first task
     */
-
-    // 1. Call the scheduler
-    //    taskCurrent = rtosScheduler();
 
     // 3. Switch to privileged mode when launching the first task
     setPSP(TOP_OF_HEAP);
@@ -351,11 +348,13 @@ void sleep(uint32_t tick)
 // REQUIRED: modify this function to lock a mutex using pendsv
 void lock(int8_t mutex)
 {
+    __asm(" SVC #6");
 }
 
 // REQUIRED: modify this function to unlock a mutex using pendsv
 void unlock(int8_t mutex)
 {
+    __asm(" SVC #7");
 }
 
 // REQUIRED: modify this function to wait a semaphore using pendsv
@@ -377,7 +376,9 @@ void systickIsr(void)
         - Decrement the ticks
         - If the ticks are zero, mark the task as ready
     */
+
     uint8_t i;
+
     for (i = 0; i < taskCount; i++)
     {
         if (tcb[i].state == STATE_DELAYED)
@@ -433,17 +434,19 @@ __attribute__((naked)) void pendSvIsr(void)
         NVIC_FAULT_STAT_R |= NVIC_FAULT_STAT_DERR;
     }
 
-    // push r4 r1
     __asm(" mov r12, lr");
-    pushR4R11();
+    pushR4R11(); // Saving the registers
 
-    tcb[taskCurrent].sp = getPSP();
-    taskCurrent = rtosScheduler();
-    setPSP(tcb[taskCurrent].sp);
-    applySramAccessMask(tcb[taskCurrent].srd);
+    tcb[taskCurrent].sp = getPSP();            // Save the stack pointer
+    taskCurrent = rtosScheduler();             // Call the scheduler
+    setPSP(tcb[taskCurrent].sp);               // Restore the stack pointer
+    applySramAccessMask(tcb[taskCurrent].srd); // Restore the SRD bits
 
     // Pop the registers from the stack (R4-R11)
-    popR4R11();
+    popR4R11(); // Restoring the registers
+
+    // Hardware will pop exception stack frame
+    // R0-R3, R12, LR, PC, xPSR
 }
 
 // REQUIRED: in preemptive code, add code to handle synchronization primitives
@@ -481,7 +484,7 @@ void svCallIsr(void)
         break;
 
     case SVC_YIELD:
-        setPendSV();
+        setPendSV(); // Does the task switching
         break;
 
     case SVC_SLEEP:
@@ -494,7 +497,56 @@ void svCallIsr(void)
         tcb[taskCurrent].state = STATE_DELAYED;
         setPendSV();
         break;
+    case SVC_LOCK:
+        /*
+            - Locks the mutex
+            - Returns if a resource is available
+            - Marks the task as blocked on a mutex
+            - Records the task in the mutex process queue
+        */
+        if (!mutexes[0].lock) // Checking if we are free
+        {
+            mutexes[0].lock = true;            // Lock the mutex
+            mutexes[0].lockedBy = taskCurrent; // Record the task that locked the mutex
+        }
+        else if (mutexes[0].lockedBy != taskCurrent) // Check that the task that is trying to lock it has done it in the past
+        {
+            /// Mark the task as blocked  will be important in the ipcs command
+            tcb[taskCurrent].state = STATE_BLOCKED_MUTEX;                // Set the state to blocked
+            mutexes[0].processQueue[mutexes[0].queueSize] = taskCurrent; // The processQueue is up to 2 tasks
+            mutexes[0].queueSize++;
+        }
+        setPendSV();
+        break;
+    case SVC_UNLOCK:
+        /*
+            - Only the thread that locked the mutex can unlock it
+        */
+        // If the task that locked the mutex is the one trying to unlock it
+        if (mutexes[0].lockedBy == taskCurrent)
+        {
+            mutexes[0].lock = false; // Unlock the mutex
+            // Check if there are any tasks in the queue
+            if (mutexes[0].queueSize > 0)
+            {
+                mutexes[0].lockedBy = mutexes[0].processQueue[0]; // Set the lockedBy to the next task in the queue
 
+                // Mark the task in queue as ready
+                tcb[mutexes[0].lockedBy].state = STATE_READY;
+
+                // Move the tasks in the queue
+                int i;
+                for (i = 0; i < mutexes[0].queueSize; i++)
+                {
+                    mutexes[0].processQueue[i] = mutexes[0].processQueue[i + 1];
+                }
+                mutexes[0].queueSize--; // Decrement the queue size
+            }
+        }
+
+
+        // TBD: else -> delete the thread
+        break;
     default:
         break;
     }
