@@ -218,8 +218,21 @@ void usageFaultIsr(void)
     };
 }
 
+/**
+ * @brief
+ * Causes a hard fault exception via causing a usage fault exception in the usage fault handler
+ */
 void causeHardFault(void)
 {
     foo = true;
     causeBusFault(); // Tries to read reserved memory
+}
+
+/**
+ * @brief
+ * Set the PendSV bit in the ICSR register
+ */
+void setPendSV(void)
+{
+    NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
 }
