@@ -49,7 +49,17 @@ extern void _c_int00(void);
 //*****************************************************************************
 extern uint32_t __STACK_TOP;
 
+/*
+   The DATA_SECTION pragma allocates space for the symbol (in my case it is heap)
+   in C, in a section named ".heap."
+
+   -> Allocates space for the symbol in the named section
+
+   This pragma is useful if you have data objects that you want to link 
+   into an area seperate from the .bss section
+*/
 #pragma DATA_SECTION(heap, ".heap")
+
 uint32_t heap[7168] = {0}; // 7168 * 4 bytes = 28672 bytes
 
 //*****************************************************************************
