@@ -184,7 +184,11 @@ void startRtos(void)
     setASP();
     setTMPL();
 
+//    enableMPU();
+//    enableMPUHandler();
+
     launchTask();   // Does a service call (Goes to privileged mode)
+
 }
 
 // REQUIRED:
@@ -492,17 +496,21 @@ void svCallIsr(void)
             - Marks the task as blocked on a mutex
             - Records the task in the mutex process queue
         */
-        if (!mutexes[0].lock) // Checking if we are free
+
+        // Need to grab the parameter which will represent the mutex
+        uint8_t mutexIdx = *(getPSP());
+
+        if (!mutexes[mutexIdx].lock) // Checking if we are free
         {
-            mutexes[0].lock = true;            // Lock the mutex
-            mutexes[0].lockedBy = taskCurrent; // Record the task that locked the mutex
+            mutexes[mutexIdx].lock = true;            // Lock the mutex
+            mutexes[mutexIdx].lockedBy = taskCurrent; // Record the task that locked the mutex
         }
-        else if (mutexes[0].lockedBy != taskCurrent) // Check that the task that is trying to lock it has done it in the past
+        else if (mutexes[mutexIdx].lockedBy != taskCurrent) // Check that the task that is trying to lock it has done it in the past
         {
             /// Mark the task as blocked  will be important in the ipcs command
             tcb[taskCurrent].state = STATE_BLOCKED_MUTEX;                // Set the state to blocked
-            mutexes[0].processQueue[mutexes[0].queueSize] = taskCurrent; // The processQueue is up to 2 tasks
-            mutexes[0].queueSize++;
+            mutexes[mutexIdx].processQueue[mutexes[mutexIdx].queueSize] = taskCurrent; // The processQueue is up to 2 tasks
+            mutexes[mutexIdx].queueSize++;
         }
 
         setPendSV(); // Does the task switching
@@ -512,35 +520,60 @@ void svCallIsr(void)
         /*
             - Only the thread that locked the mutex can unlock it
         */
+        // Need to grab the paramter which will represent the mutex
+        uint8_t mutexIdx = *(getPSP());
+
         // If the task that locked the mutex is the one trying to unlock it
-        if (mutexes[0].lockedBy == taskCurrent)
+        if (mutexes[mutexIdx].lockedBy == taskCurrent)
         {
-            mutexes[0].lock = false; // Unlock the mutex
+            mutexes[mutexIdx].lock = false; // Unlock the mutex
             // Check if there are any tasks in the queue
-            if (mutexes[0].queueSize > 0)
+            if (mutexes[mutexIdx].queueSize > 0)
             {
-                mutexes[0].lockedBy = mutexes[0].processQueue[0]; // Set the lockedBy to the next task in the queue
+                mutexes[mutexIdx].lockedBy = mutexes[mutexIdx].processQueue[0]; // Set the lockedBy to the next task in the queue
 
                 // Mark the task in queue as ready
                 tcb[mutexes[0].lockedBy].state = STATE_READY;
 
                 // Move the tasks in the queue
                 int i;
-                for (i = 0; i < mutexes[0].queueSize; i++)
+                for (i = 0; i < mutexes[mutexIdx].queueSize; i++)
                 {
-                    mutexes[0].processQueue[i] = mutexes[0].processQueue[i + 1];
+                    mutexes[mutexIdx].processQueue[i] = mutexes[0].processQueue[i + 1];
                 }
-                mutexes[0].queueSize--; // Decrement the queue size
+                mutexes[mutexIdx].queueSize--; // Decrement the queue size
             }
         }
         // TBD: else -> delete the thread
 
         break;
     case SVC_WAIT:
+        /*
+            - Decrements the semaphore count and 
+              returns if a resource is available.
+
+            - If not available marks the task as blocked on a semaphore, and 
+              records the task in the semaphore process queue
+        */
+        if (semaphores[0].count > 0)
+        {
+            semaphores[0].count--;
+        }
+        else
+        {
+            semaphores[0].processQueue[semaphores[0].queueSize] = taskCurrent;
+            semaphores[0].queueSize++;
+            tcb[taskCurrent].state = STATE_BLOCKED_SEMAPHORE;
+        }
         setPendSV();
         break;
 
     case SVC_POST:
+    /*
+        Increases the semaphore count. 
+        If a process is waiting in the queue, decrement the count and mark the task as ready
+
+    */
         break;
 
     default:
