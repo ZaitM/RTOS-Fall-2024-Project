@@ -340,7 +340,7 @@ void allowPeripheralAccess(void)
 /**
  * @brief
  * Creates multiple MPU regions to cover 32 KiB SRAM
- * Each MPU region covers 8 KiB or 4 KiB with subregions
+ * Each MPU region covers 8 KiB or 4 KiB with regions
  * of 512B or 1 KiB each with RW access for privileged and no access for unprivileged
  *
  * -> Disable the subregions to start
