@@ -108,7 +108,7 @@ void idle2(void)
 {
     while (true)
     {
-//        lock(resource);
+        //        lock(resource);
         setPinValue(BLUE_LED, 1);
         waitMicrosecond(1000);
         setPinValue(BLUE_LED, 0);
@@ -147,7 +147,8 @@ void lengthyFn(void)
 {
     uint16_t i;
     uint8_t *mem;
-    mem = (uint8_t*)mallocFromHeap(5000 * sizeof(uint8_t));
+    mem = (uint8_t *)malloc_from_heap_wrapper(5000 * sizeof(uint8_t));
+
     while (true)
     {
         lock(resource);
