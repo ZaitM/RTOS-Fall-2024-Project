@@ -15,3 +15,5 @@ targetConfigs/
 scratch-code.c
 .launches/
 .vscode/launch.json
+*.pdf
+.vscode/launch.json
