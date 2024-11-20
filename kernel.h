@@ -70,6 +70,6 @@ void svCallIsr(void);   // This function takes care of the SVC calls
 // Subroutines by programmer
 //-----------------------------------------------------------------------------
 void launchTask(void);
-void initSysTick(void); // Initialize the system timer to 1 ms
+void *malloc_from_heap_wrapper(uint32_t size);
 
 #endif
