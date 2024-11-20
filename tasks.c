@@ -20,11 +20,17 @@
 #include "kernel.h"
 #include "tasks.h"
 
-#define RED_LED PORTE, 0    // off-board red LED
-#define ORANGE_LED PORTA, 2 // off-board orange LED
-#define YELLOW_LED PORTA, 3 // off-board yellow LED
-#define GREEN_LED PORTA, 4  // off-board green LED
+#define RED_LED PORTA, 2    // off-board red LED. Originally Port E 0
+#define ORANGE_LED PORTE, 0 // off-board orange LED. Originally Port A 2
+#define YELLOW_LED PORTA, 4 // off-board yellow LED. Originally Port A 3
+#define GREEN_LED PORTA, 3  // off-board green LED. Originally Port A 4
 #define BLUE_LED PORTF, 2   // on-board blue LED
+
+//-----------------------------------------------------------------------------
+// Device includes, defines, and assembler directives included by programmer
+//-----------------------------------------------------------------------------
+
+#include "mm.h"
 
 //-----------------------------------------------------------------------------
 // Subroutines
@@ -46,9 +52,9 @@ void initHw(void)
     selectPinPushPullOutput(BLUE_LED);
 
     // Setup RGB LED
-    selectPinPushPullOutput(PORTF, 1); // RED 
-    selectPinPushPullOutput(PORTF, 2); // BLUE 
-    selectPinPushPullOutput(PORTF, 3); // GREEN 
+    selectPinPushPullOutput(PORTF, 1); // RED
+    selectPinPushPullOutput(PORTF, 2); // BLUE
+    selectPinPushPullOutput(PORTF, 3); // GREEN
 
     // Setup pushbuttons
     enablePort(PORTC);
@@ -80,7 +86,7 @@ uint8_t readPbs(void)
     uint8_t pbValues = 0;
 
     pbValues = ~(getPortValue(PORTC) >> 4) & 0x0F;
-    pbValues = ~(getPortValue(PORTD) >> 2) & 0x30;
+    pbValues |= ~(getPortValue(PORTD) >> 2) & 0x30;
 
     return pbValues;
 }
@@ -91,10 +97,9 @@ void idle(void)
 {
     while (true)
     {
-        setPinValue(GREEN_LED, 1);
+        setPinValue(ORANGE_LED, 1);
         waitMicrosecond(1000);
-        setPinValue(GREEN_LED, 0);
-//        sleep(1000);
+        setPinValue(ORANGE_LED, 0);
         yield();
     }
 }
@@ -103,10 +108,10 @@ void idle2(void)
 {
     while (true)
     {
+//        lock(resource);
         setPinValue(BLUE_LED, 1);
         waitMicrosecond(1000);
         setPinValue(BLUE_LED, 0);
-        //sleep(1000);
         yield();
     }
 }
@@ -142,7 +147,7 @@ void lengthyFn(void)
 {
     uint16_t i;
     uint8_t *mem;
-    mem = mallocFromHeap(5000 * sizeof(uint8_t));
+    mem = (uint8_t*)mallocFromHeap(5000 * sizeof(uint8_t));
     while (true)
     {
         lock(resource);
@@ -151,7 +156,7 @@ void lengthyFn(void)
             partOfLengthyFn();
             mem[i] = i % 256;
         }
-        setPinValue(RED_LED, !getPinValue(RED_LED));
+        setPinValue(RED_LED, !getPinValue(RED_LED)); // Originally RED_LED
         unlock(resource);
     }
 }
