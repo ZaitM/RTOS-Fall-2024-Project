@@ -157,7 +157,7 @@ void lengthyFn(void)
             partOfLengthyFn();
             mem[i] = i % 256;
         }
-        setPinValue(RED_LED, !getPinValue(RED_LED)); // Originally RED_LED
+        setPinValue(RED_LED, !getPinValue(RED_LED)); 
         unlock(resource);
     }
 }
