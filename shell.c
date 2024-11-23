@@ -36,15 +36,6 @@ void shell(void)
 
     while (true)
     {
-        if (!getPinValue(PORTC, 4))
-            causeBusFault();
-        if (!getPinValue(PORTC, 5))
-            causeUsageFault();
-        if (!getPinValue(PORTC, 6))
-            causeHardFault();
-        if (!getPinValue(PORTC, 7))
-            causeMemFault();
-
         if (kbhitUart0())
         {
             bool foo = 0;
@@ -177,3 +168,4 @@ void shell(void)
         yield();
     }
 }
+
