@@ -25,16 +25,22 @@
 #include "faults.h"
 #define EXC_RETURN_THREAD_PSP 0xFFFFFFFD
 
-#define SVC_START_R         0
-#define SVC_YIELD           1
-#define SVC_RESTART_T       2
-#define SVC_STOP_T          3
-#define SVC_SET_PRIORITY_T  4
-#define SVC_SLEEP           5
-#define SVC_LOCK            6
-#define SVC_UNLOCK          7
-#define SVC_WAIT            8
-#define SVC_POST            9
+//-----------------------------------------------------------------------------
+// Macros for the SVC calls
+//-----------------------------------------------------------------------------
+#define SVC_START_R 0
+#define SVC_YIELD 1
+#define SVC_RESTART_T 2
+#define SVC_STOP_T 3
+#define SVC_SET_PRIORITY_T 4
+#define SVC_SLEEP 5
+#define SVC_LOCK 6
+#define SVC_UNLOCK 7
+#define SVC_WAIT 8
+#define SVC_POST 9
+#define SVC_MALLOC_WRAPPER 10
+#define SVC_FREE_WRAPPER 11
+#define SVC_PIDOF 12
 
 /*
     The PSR is a combination of the following:
@@ -139,7 +145,7 @@ void initRtos(void)
         tcb[i].pid = 0;
     }
 
-    // Disable the SysTick timer
+    // Disable the SyshellsTick timer
     NVIC_ST_CTRL_R = 0;
 
     // Set the clock source to the system clock
@@ -161,13 +167,94 @@ uint8_t rtosScheduler(void)
     bool ok;
     static uint8_t task = 0xFF;
     ok = false;
-    while (!ok)
+
+    if (!priorityScheduler)
     {
-        task++;
-        if (task >= MAX_TASKS)
-            task = 0;
-        ok = (tcb[task].state == STATE_READY);
+        while (!ok)
+        {
+            task++;
+            if (task >= MAX_TASKS)
+                task = 0;
+            ok = (tcb[task].state == STATE_READY);
+        }
     }
+    else
+    {
+        /*
+            - Look for the highest priority
+            - If the task is ready at that priority
+              then dispatch that task
+            - Dispatch tasks in order for that priority level
+            - Each priority level will have an index to keep track
+            - The concept of priority rings
+        */
+        static uint8_t currentPriority = 0x00;
+        uint8_t highestPrioAndReadyTask = 0xFF;
+
+        static int64_t nextTaskWithSamePriority[NUM_PRIORITIES] =
+            {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+        uint8_t x = 0, i = 0;
+        bool found = false;
+
+        // If there is a -1 then go fill the queue for that prio
+        // else dispatch the task at the current priority
+
+        if (nextTaskWithSamePriority[currentPriority] == -1)
+        {
+            // First time in answer one question only; Who is the highest priority and is ready
+            for (i = currentPriority; i < NUM_PRIORITIES; i++)
+            {
+                for (x = 0; x < taskCount; x++)
+                {
+                    if (tcb[x].state == STATE_READY && tcb[x].priority == currentPriority)
+                    {
+                        highestPrioAndReadyTask = x;
+                        nextTaskWithSamePriority[currentPriority] = highestPrioAndReadyTask;
+                        // The bottom retain 6 in the  queue and sign extended
+                        nextTaskWithSamePriority[currentPriority] = (nextTaskWithSamePriority[currentPriority] & 0xF) | ~0xF;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                    break;
+                currentPriority++;
+            }
+
+            // See if there are tasks that are ready and have the same priority within the same priority ring
+            // Will execute if it finds an index of a task that is ready and has the same priority
+            // Checking if it is not the default priority
+            if (highestPrioAndReadyTask != 0xFF)
+            {
+                uint8_t j = 0;
+                uint8_t iterator = 1; // Cannot start at zero. Only reason it is here is cause it there is someone in the queue
+
+                // Find the task with same priority and is STATE_READY
+                for (j = x + 1; j < taskCount; j++) // Don't bother checking the rest. So set to x. From where I am. Current prio
+                {
+                    if (tcb[j].priority == (currentPriority) && tcb[j].state == STATE_READY)
+                    {
+
+                        // j represents the idx of the tcb of the next task to run in the prio ring
+                        // Perform left shift to store the index of the next task with the same priority
+                        nextTaskWithSamePriority[currentPriority] &= ~(0xF << (iterator * 4)); // Clear the bit field
+                        nextTaskWithSamePriority[currentPriority] |= (j << (iterator++ * 4));
+                    }
+                }
+            }
+        }
+
+        // Would need to see the next task with the prior priority
+        uint8_t nextTask = nextTaskWithSamePriority[currentPriority] & 0x0F;
+        nextTaskWithSamePriority[currentPriority] >>= 4; // This will mark it as -1 when there is only one task
+
+        // If it is not empty stay at same level and rr
+        currentPriority = nextTaskWithSamePriority[currentPriority] != -1 ? currentPriority : 0x00;
+
+        task = nextTask; // Faulting here due to being assigned the default value when nothing is found
+    }
+
     return task;
 }
 
@@ -184,11 +271,10 @@ void startRtos(void)
     setASP();
     setTMPL();
 
-//    enableMPU();
-//    enableMPUHandler();
+    //    enableMPU();
+    //    enableMPUHandler();
 
-    launchTask();   // Does a service call (Goes to privileged mode)
-
+    launchTask(); // Does a service call (Goes to privileged mode)
 }
 
 // REQUIRED:
@@ -229,11 +315,11 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             strCopy(tcb[i].name, name);
 
             tcb[i].state = STATE_READY;
-            tcb[i].pid = fn;
+            tcb[i].pid = fn; //
             // Adjust the sp to the top of the stack
             tcb[i].sp = (void *)((uint32_t)ptr + stackBytes);
             tcb[i].spInit = (void *)((uint32_t)ptr + stackBytes); // May not need this as mentioned in class
-            tcb[i].priority = priority;
+            tcb[i].priority = priority;                           //
             tcb[i].srd = createNoSramAccessMask();
 
             // 3.  Configure/Modify the srd bit mask
@@ -355,6 +441,11 @@ void wait(int8_t semaphore)
 void post(int8_t semaphore)
 {
     __asm(" SVC #9");
+}
+
+void *malloc_from_heap_wrapper(uint32_t size)
+{
+    __asm(" SVC #10");
 }
 
 // REQUIRED: modify this function to add support for the system timer
@@ -490,6 +581,7 @@ void svCallIsr(void)
         break;
 
     case SVC_LOCK:
+    {
         /*
             - Locks the mutex
             - Returns if a resource is available
@@ -498,7 +590,8 @@ void svCallIsr(void)
         */
 
         // Need to grab the parameter which will represent the mutex
-        uint8_t mutexIdx = *(getPSP());
+        uint8_t mutexIdx;
+        mutexIdx = *(getPSP());
 
         if (!mutexes[mutexIdx].lock) // Checking if we are free
         {
@@ -508,20 +601,23 @@ void svCallIsr(void)
         else if (mutexes[mutexIdx].lockedBy != taskCurrent) // Check that the task that is trying to lock it has done it in the past
         {
             /// Mark the task as blocked  will be important in the ipcs command
-            tcb[taskCurrent].state = STATE_BLOCKED_MUTEX;                // Set the state to blocked
+            tcb[taskCurrent].state = STATE_BLOCKED_MUTEX;                              // Set the state to blocked
             mutexes[mutexIdx].processQueue[mutexes[mutexIdx].queueSize] = taskCurrent; // The processQueue is up to 2 tasks
             mutexes[mutexIdx].queueSize++;
         }
 
         setPendSV(); // Does the task switching
-        break;
 
+        break;
+    }
     case SVC_UNLOCK:
+    {
         /*
             - Only the thread that locked the mutex can unlock it
         */
         // Need to grab the paramter which will represent the mutex
-        uint8_t mutexIdx = *(getPSP());
+        uint8_t mutexIdx;
+        mutexIdx = *(getPSP());
 
         // If the task that locked the mutex is the one trying to unlock it
         if (mutexes[mutexIdx].lockedBy == taskCurrent)
@@ -531,7 +627,7 @@ void svCallIsr(void)
             if (mutexes[mutexIdx].queueSize > 0)
             {
                 mutexes[mutexIdx].lockedBy = mutexes[mutexIdx].processQueue[0]; // Set the lockedBy to the next task in the queue
-
+                mutexes[mutexIdx].lock = true;                                  // Added according to Leo
                 // Mark the task in queue as ready
                 tcb[mutexes[0].lockedBy].state = STATE_READY;
 
@@ -547,38 +643,93 @@ void svCallIsr(void)
         // TBD: else -> delete the thread
 
         break;
+    }
     case SVC_WAIT:
+    {
         /*
-            - Decrements the semaphore count and 
+            - Decrements the semaphore count and
               returns if a resource is available.
 
-            - If not available marks the task as blocked on a semaphore, and 
+            - If not available marks the task as blocked on a semaphore, and
               records the task in the semaphore process queue
         */
-        if (semaphores[0].count > 0)
+
+        // Grab the semaphore index from the parameter
+        uint8_t semaphoreIdx;
+        semaphoreIdx = *(getPSP());
+
+        if (semaphores[semaphoreIdx].count > 0)
         {
-            semaphores[0].count--;
+            semaphores[semaphoreIdx].count--; // Equivalent to CONSUMING a resource?
+            return;
         }
         else
         {
-            semaphores[0].processQueue[semaphores[0].queueSize] = taskCurrent;
-            semaphores[0].queueSize++;
+            // Place in the processQueue by setting the index to queueSize
+            semaphores[semaphoreIdx].processQueue[semaphores[semaphoreIdx].queueSize] = taskCurrent;
+            semaphores[semaphoreIdx].queueSize++;
             tcb[taskCurrent].state = STATE_BLOCKED_SEMAPHORE;
+            tcb[taskCurrent].semaphore = semaphoreIdx;
+            setPendSV();
         }
-        setPendSV();
         break;
-
+    }
     case SVC_POST:
-    /*
-        Increases the semaphore count. 
-        If a process is waiting in the queue, decrement the count and mark the task as ready
+    {
+        /*
+            Increases the semaphore count.
+            If a process is waiting in the queue, decrement the count and mark the task as ready
+        */
 
-    */
+        // Grab the semaphore index from the parameter
+        uint8_t semaphoreIdx = *(getPSP());
+
+        // Increment the semaphore count for posting
+        // For that specific semaphore
+        semaphores[semaphoreIdx].count++; // Equivalent to PRODUCING a resource?
+
+        // Check if there are any tasks in the queue
+        if (semaphores[semaphoreIdx].queueSize > 0)
+        {
+            semaphores[semaphoreIdx].count--; // Decrement the count
+
+            // Set the task in the queue as ready
+            tcb[semaphores[semaphoreIdx].processQueue[0]].state = STATE_READY;
+
+            // Move the tasks in the queue
+            uint8_t i;
+            for (i = 0; i < semaphores[semaphoreIdx].queueSize; i++)
+            {
+                semaphores[semaphoreIdx].processQueue[i] = semaphores[semaphoreIdx].processQueue[i + 1];
+            }
+            semaphores[semaphoreIdx].queueSize--; // Decrement the queue size
+        }
+
         break;
+    }
+    case SVC_MALLOC_WRAPPER:
+    {
+        // Get the size of the memory to allocate from R0
+        uint32_t size = *(getPSP());
 
+        void *ptr = mallocFromHeap(size);
+        addSramAccessWindow(&tcb[taskCurrent].srd, (uint32_t *)ptr, size);
+        // Apply the current task's SRD bits
+        applySramAccessMask(tcb[taskCurrent].srd);
+
+        // Write the memory allocated to R0
+        *(getPSP()) = ptr;
+
+        break;
+    }
     default:
         break;
     }
+}
+
+void *getPID(void)
+{
+    return tcb[taskCurrent].pid;
 }
 
 //-----------------------------------------------------------------------------
