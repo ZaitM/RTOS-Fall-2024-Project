@@ -40,6 +40,12 @@ typedef void (*_fn)();  // Returns void, pointer to function, no parameters
 // tasks
 #define MAX_TASKS 12
 
+// control
+#define PREEMPTIVE 1
+#define COOPERATIVE 0
+#define PRIORITY_SCHEDULER 1
+#define ROUND_ROBIN_SCHEDULER 0
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
@@ -71,5 +77,6 @@ void svCallIsr(void);   // This function takes care of the SVC calls
 //-----------------------------------------------------------------------------
 void launchTask(void);
 void *malloc_from_heap_wrapper(uint32_t size);
+void* getPID(void);
 
 #endif
