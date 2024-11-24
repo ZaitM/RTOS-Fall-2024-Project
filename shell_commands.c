@@ -18,7 +18,7 @@ void reboot(void)
         To write to the register, 0x05FA must be written to the VECTKEY field i.e bits 31:16
         otherwise the write is ignored.
     */
-    NVIC_APINT_R = NVIC_APINT_VECTKEY | NVIC_APINT_SYSRESETREQ;
+    __asm(" SVC #12");
 }
 
 /**
@@ -79,7 +79,7 @@ void pi(bool state)
  */
 void preempt(bool state)
 {
-    state ? putsUart0("preempt on\n") : putsUart0("preempt off\n");
+    __asm(" SVC #18");
 }
 
 /**
@@ -91,7 +91,7 @@ void preempt(bool state)
  */
 void sched(bool prio_on)
 {
-    __asm(" SVC #13")
+    __asm(" SVC #19");
 }
 
 /**
@@ -99,9 +99,9 @@ void sched(bool prio_on)
  * Display the PID of the process (thread).
  * @param name
  */
-void pidof(const char name[], uint32_t* pid)
+void pidof(const char name[], uint32_t *pid)
 {
-    __asm(" SVC #12");
+    __asm(" SVC #20");
 }
 
 /**
