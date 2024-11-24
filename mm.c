@@ -468,6 +468,8 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
         size_in_bytes should not exceed 4096
     */
 
+    uint32_t alignedSize = ALIGN_SIZE(size_in_bytes);
+
     // Step 1: Determine base region
     uint32_t baseRegion = FIND_PTR_BASE(baseAdd);
     uint32_t startSubregion = ((uint32_t)baseAdd - baseRegion) / FIND_PTR_SUBREGION_SIZE(baseAdd); // Holds a value between 0 and 7
@@ -476,7 +478,7 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
     // Step 2: Calculate the appropriate mask for the given size
     if (baseRegion != BASE_R1 && baseRegion != BASE_R2)
     {
-        switch (size_in_bytes)
+        switch (alignedSize)
         {
         case 512:
             mask = 0x01;
@@ -509,7 +511,7 @@ void addSramAccessWindow(uint64_t *srdBitMask, uint32_t *baseAdd, uint32_t size_
     }
     else // Base region is R1 or R2
     {
-        switch (size_in_bytes)
+        switch (alignedSize)
         {
         case 1024:
             mask = 0x01;
