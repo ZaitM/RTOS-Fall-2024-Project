@@ -17,6 +17,8 @@
 #include "faults.h"
 #include "CortexM4Registers.h"
 #include "shell_auxiliary.h"
+#include "kernel.h"
+
 //-----------------------------------------------------------------------------
 // Globals
 //-----------------------------------------------------------------------------
@@ -36,8 +38,10 @@ void mpuFaultIsr(void)
     uint32_t *psp = getPSP();
     uint32_t pc = getPC();
 
-    putsUart0("MMU fault in PID:\n\n");
-    putsUart0("Values of the core registers:\n");
+    putsUart0("MMU fault in PID = 0x");
+    itoa((uint32_t)getPID(), str, 16);
+    putsUart0(str);
+    putsUart0("\nValues of the core registers:\n");
 
     putsUart0("PSP = 0x");
     itoa(psp, str, 16);
@@ -114,6 +118,9 @@ void mpuFaultIsr(void)
 
     // Set the pc to the link register
     *(psp + 6) = *(psp + 5);
+
+    while (true)
+        ;
 }
 
 // REQUIRED: code this function
@@ -121,8 +128,11 @@ void hardFaultIsr(void)
 {
     char str[32];
     uint32_t *psp = (uint32_t *)getPSP();
-    putsUart0("Hard fault in PID: \n");
-    putsUart0("Values of the core registers:\n");
+
+    putsUart0("Hard fault in PID = 0x");
+    itoa((uint32_t)getPID(), str, 16);
+    putsUart0(str);
+    putsUart0("\nValues of the core registers:\n");
 
     putsUart0("PSP = 0x");
     itoa(psp, str, 16);
@@ -194,9 +204,13 @@ void busFaultIsr(void)
     }
 
     char str[32];
-    putsUart0("Bus fault in PID:!\n\n");
+
+    putsUart0("Bus fault in PID = 0x");
+    itoa((uint32_t)getPID(), str, 16);
+    putsUart0(str);
+
+    putsUart0("\nAddress that caused the bus fault: 0x");
     itoa(NVIC_FAULT_ADDR_R, str, 16);
-    putsUart0("Address that caused the bus fault: 0x");
     putsUart0(str);
     putsUart0("\n\n");
     while (true)
@@ -208,9 +222,13 @@ void busFaultIsr(void)
 void usageFaultIsr(void)
 {
     char str[32];
+
+    putsUart0("Usage fault in PID = 0x");
+    itoa((uint32_t)getPID(), str, 16);
+    putsUart0(str);
+
+    putsUart0("\nCFSR: 0x");
     itoa(NVIC_FAULT_STAT_R, str, 16); // Read the 25th bit of the NVIC_FAULT_STAT_R (CFSR)
-    putsUart0("Usage fault in PID:\n");
-    putsUart0("CFSR: 0x");
     putsUart0(str);
     putsUart0("\n\n");
     while (true)
