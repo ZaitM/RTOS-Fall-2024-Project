@@ -1,21 +1,16 @@
 #include "shell_commands.h"
 #include "shell_auxiliary.h"
 
-// void yield(void)
-// {
-//     // Empty function called to yield the processor
-// }
-
 /**
- * @brief 
- * Reboots the microcontroller. Will be implemenented 
- * as part of the mini project. 
+ * @brief
+ * Reboots the microcontroller. Will be implemenented
+ * as part of the mini project.
  */
 void reboot(void)
 {
     /*
         Can only be accessed from priveleged mode.
-        Provides priority grouping control for the 
+        Provides priority grouping control for the
         - exception model
         - endian status
         - reset control of the system
@@ -27,9 +22,9 @@ void reboot(void)
 }
 
 /**
- * @brief 
- * Displays the process status. 
- * For now, it displays the text "ps called" 
+ * @brief
+ * Displays the process status.
+ * For now, it displays the text "ps called"
  */
 void ps(void)
 {
@@ -37,7 +32,7 @@ void ps(void)
 }
 
 /**
- * @brief 
+ * @brief
  * Displays the inter-process (thread) communication status
  */
 void ipcs()
@@ -46,19 +41,18 @@ void ipcs()
 }
 
 /**
- * @brief 
- * Kills the process (thread) with the matching PID. 
- * @param pid 
+ * @brief
+ * Kills the process (thread) with the matching PID.
+ * @param pid
  */
 void kill(int32_t pid)
 {
-  char str[10];
+    char str[10];
 
-  itoa(pid, str, 10);
-  putsUart0("PID killed: ");
-  putsUart0(str);
-  putsUart0("\n");
-
+    itoa(pid, str, 10);
+    putsUart0("PID killed: ");
+    putsUart0(str);
+    putsUart0("\n");
 }
 
 void pkill(const char name[])
@@ -76,7 +70,6 @@ void pkill(const char name[])
 void pi(bool state)
 {
     state ? putsUart0("pi on\n") : putsUart0("pi off\n");
-    
 }
 
 /**
@@ -98,7 +91,7 @@ void preempt(bool state)
  */
 void sched(bool prio_on)
 {
-    prio_on ? putsUart0("sched prio\n") : putsUart0("sched rr\n");
+    __asm(" SVC #13")
 }
 
 /**
@@ -106,10 +99,9 @@ void sched(bool prio_on)
  * Display the PID of the process (thread).
  * @param name
  */
-void pidof(const char name[])
+void pidof(const char name[], uint32_t* pid)
 {
-    putsUart0(name);
-    putsUart0(" launched\n");
+    __asm(" SVC #12");
 }
 
 /**
