@@ -733,7 +733,7 @@ void svCallIsr(void)
 
         void *ptr = mallocFromHeap(size);
 
-        dynamicMemoryOfEachTask[taskCurrent] = size;
+        dynamicMemoryOfEachTask[taskCurrent] += size;
 
         addSramAccessWindow(&tcb[taskCurrent].srd, (uint32_t *)ptr, size);
         // Apply the current task's SRD bits
