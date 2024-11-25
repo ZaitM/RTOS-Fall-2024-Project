@@ -51,7 +51,8 @@ void shell(void)
             putsUart0("Output:\n");
             putsUart0(data.buffer);
             putcUart0('\n');
-#endif DEBUG
+#endif
+
             // Parse fields
             parseFields(&data);
 
@@ -71,6 +72,7 @@ void shell(void)
 
             if (isCommand(&data, "reboot", 0))
             {
+                putsUart0("Rebooting...\n\n");
                 reboot();
                 foo = true;
             }
@@ -160,7 +162,59 @@ void shell(void)
 
                 foo = true;
             }
-            if (!foo)
+            else if (isCommand(&data, "meminfo", 0))
+            {
+                char listOfTasks[MAX_TASKS][10] = {0};
+                char strBuffer[MAX_CHARS] = {0};
+                uint32_t baseAddress[MAX_TASKS] = {0};
+                uint32_t sizeOfTask[MAX_TASKS] = {0};
+                uint32_t dynamicMemOfEachTask[MAX_TASKS] = {1,1,1,1,1,1,1,1,1,1,1,1};
+                uint8_t taskCount = 0;
+
+                putsUart0("\nTask Name\tBase Address\tSize\t\tDynamic Memory\n");
+                putsUart0("------------------------------------------------------------\n\n");
+                meminfo(listOfTasks, baseAddress, sizeOfTask, &taskCount, dynamicMemOfEachTask);
+
+                uint8_t i = 0;
+
+                for (i = 0; i < taskCount; i++)
+                {
+                    uint8_t j = 0;
+
+                    // Print the task name
+                    putsUart0(listOfTasks[i]);
+                    for (j = stringLength(listOfTasks[i]); j < 16; j++)
+                        putcUart0(' ');
+
+                    // Print the base address
+                    itoa(baseAddress[i], strBuffer, 16);
+                    putsUart0("0x");
+                    putsUart0(strBuffer);
+                    for (j = stringLength(strBuffer) + 2; j < 16; j++)
+                        putcUart0(' ');
+
+                    // Print the size of the task
+                    itoa(sizeOfTask[i], strBuffer, 10);
+                    putsUart0(strBuffer);
+                    for(j = stringLength(strBuffer); j < 16; j++)
+                        putcUart0(' ');
+
+                    // Print the dynamic memory of each task
+                    itoa(dynamicMemOfEachTask[i],strBuffer,10);
+                    putsUart0(strBuffer);
+
+                    putcUart0('\n');
+                }
+                putcUart0('\n');
+
+                foo = true;
+            }
+            else if (isCommand(&data, "clear", 0))
+            {
+                // Clear the screen and move the cursor to the top left
+                putsUart0("\033[2J\033[H");
+            }
+            else if (!foo)
                 putsUart0("Invalid command!\n\n");
             clearStruct(&data);
         }
