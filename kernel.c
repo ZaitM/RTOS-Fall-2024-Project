@@ -40,7 +40,17 @@
 #define SVC_POST 9
 #define SVC_MALLOC_WRAPPER 10
 #define SVC_FREE_WRAPPER 11
-#define SVC_PIDOF 12
+
+#define SVC_REBOOT 12
+#define SVC_PS 13
+#define SVC_IPCS 14
+#define SVC_KILL 15
+#define SVC_PKILL 16
+#define SVC_PI 17
+#define SVC_PREEMPT 18
+#define SVC_SCHED 19
+#define SVC_PIDOF 20
+#define SVC_MEMINFO 21
 
 /*
     The PSR is a combination of the following:
@@ -85,9 +95,9 @@ uint8_t taskCurrent = 0; // index of last dispatched task
 uint8_t taskCount = 0;   // total number of valid tasks
 
 // control
-bool priorityScheduler = true;    // priority (true) or round-robin (false)
-bool priorityInheritance = false; // priority inheritance for mutexes
-bool preemption = false;          // preemption (true) or cooperative (false)
+bool priorityScheduler = PRIORITY_SCHEDULER; // priority (true) or round-robin (false)
+bool priorityInheritance = false;            // priority inheritance for mutexes
+bool preemption = PREEMPTIVE;                // preemption (true) or cooperative (false)
 
 // tcb
 #define NUM_PRIORITIES 16
@@ -104,6 +114,8 @@ struct _tcb
     char name[16];           // name of task used in ps command
     uint8_t mutex;           // index of the mutex in use or blocking the thread
     uint8_t semaphore;       // index of the semaphore that is blocking the thread
+    uint32_t sizeOfStack;    // size of the stack
+    uint32_t baseAdress;     // Base adress
 } tcb[MAX_TASKS];
 
 //-----------------------------------------------------------------------------
@@ -235,7 +247,6 @@ uint8_t rtosScheduler(void)
                 {
                     if (tcb[j].priority == (currentPriority) && tcb[j].state == STATE_READY)
                     {
-
                         // j represents the idx of the tcb of the next task to run in the prio ring
                         // Perform left shift to store the index of the next task with the same priority
                         nextTaskWithSamePriority[currentPriority] &= ~(0xF << (iterator * 4)); // Clear the bit field
@@ -262,6 +273,7 @@ void launchTask()
 {
     __asm(" SVC #0");
 }
+
 // REQUIRED: modify this function to start the operating system
 // by calling scheduler, set srd bits, setting PSP, ASP bit, call fn with fn add in R0
 // fn set TMPL bit, and PC <= fn
@@ -270,9 +282,6 @@ void startRtos(void)
     setPSP(TOP_OF_HEAP);
     setASP();
     setTMPL();
-
-    //    enableMPU();
-    //    enableMPUHandler();
 
     launchTask(); // Does a service call (Goes to privileged mode)
 }
@@ -307,9 +316,13 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             {
                 i++;
             }
-
+             uint32_t size = ALIGN_SIZE(stackBytes);
             // 1. Create a void pointer. Preallocate memory for the thread
-            void *ptr = mallocFromHeap(stackBytes);
+            void *ptr = mallocFromHeap(size);
+
+            tcb[i].baseAdress = (uint32_t)ptr;
+
+            tcb[i].sizeOfStack = size;
 
             // 2. Store the thread name
             strCopy(tcb[i].name, name);
@@ -317,13 +330,13 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             tcb[i].state = STATE_READY;
             tcb[i].pid = fn; //
             // Adjust the sp to the top of the stack
-            tcb[i].sp = (void *)((uint32_t)ptr + stackBytes);
-            tcb[i].spInit = (void *)((uint32_t)ptr + stackBytes); // May not need this as mentioned in class
+            tcb[i].sp = (void *)((uint32_t)ptr + size);
+            tcb[i].spInit = (void *)((uint32_t)ptr + size); // May not need this as mentioned in class
             tcb[i].priority = priority;                           //
             tcb[i].srd = createNoSramAccessMask();
 
             // 3.  Configure/Modify the srd bit mask
-            addSramAccessWindow(&tcb[i].srd, ptr, stackBytes);
+            addSramAccessWindow(&tcb[i].srd, ptr, size);
 
             // 4. Make the thread appea as if it has run before
             uint32_t *psp = (uint32_t *)tcb[i].sp;
@@ -471,6 +484,9 @@ void systickIsr(void)
             }
         }
     }
+
+    if (preemption)
+        setPendSV();
 }
 
 // REQUIRED: in coop and preemptive, modify this function to add support for task switching
@@ -709,21 +725,92 @@ void svCallIsr(void)
     }
     case SVC_MALLOC_WRAPPER:
     {
+        // This function will be called within unprivileged tasks
+
         // Get the size of the memory to allocate from R0
         uint32_t size = *(getPSP());
+        size = ALIGN_SIZE(size);
 
         void *ptr = mallocFromHeap(size);
+
+        dynamicMemoryOfEachTask[taskCurrent] = size;
+
         addSramAccessWindow(&tcb[taskCurrent].srd, (uint32_t *)ptr, size);
         // Apply the current task's SRD bits
         applySramAccessMask(tcb[taskCurrent].srd);
 
         // Write the memory allocated to R0
-        *(getPSP()) = ptr;
+        *(getPSP()) = (uint32_t)ptr;
 
         break;
     }
-    default:
+    case SVC_REBOOT:
+    {
+        NVIC_APINT_R = NVIC_APINT_VECTKEY | NVIC_APINT_SYSRESETREQ;
         break;
+    }
+    case SVC_PREEMPT:
+    {
+        bool status = *getPSP();
+        preemption = status;
+
+        break;
+    }
+    case SVC_SCHED:
+    {
+        bool prio_status = *(getPSP());
+
+        // Set the priority scheduler
+        priorityScheduler = prio_status;
+
+        break;
+    }
+    case SVC_PIDOF:
+    {
+        // R0: Process name
+        // R1: Address to a uint32_t variable
+        uint8_t i;
+        for (i = 0; i < taskCount; i++)
+        {
+            if (strCmp(tcb[i].name, (char *)*(getPSP())))
+            {
+                // Write to R1 the PID of the task
+                uint32_t *psp = getPSP(); // Getting R0. const char []
+                uint32_t *r1 = (psp + 1); // Getting R1. address of uint32_t
+
+                uint32_t *pid = (uint32_t *)*r1; // Dereferencing R1 to access the address of the parameter and casting to pointer type
+                *pid = (uint32_t)tcb[i].pid;     // Dereferencing the adress to store the value
+
+                break;
+            }
+        }
+        break;
+    }
+    case SVC_MEMINFO:
+    {
+        // R0: Address to an array of char
+        // R1: Address to an array of uint32_t
+        // R2: Address to an array of uint32_t for the sizes of each task
+        // R3: Pointer to the task count
+        // Let shell know how many tasks are running i.e. taskCount (global variable in kernel.c)
+
+        char(*namesOfTasks)[10] =       (char(*)[10]) * (getPSP());
+        uint32_t *baseAddress =         ( uint32_t *)  *((getPSP()) + 1);
+        uint32_t *sizeOfTask =           (uint32_t *)  *((getPSP()) + 2);
+        uint8_t *taskCountToShell =      (uint8_t *)   *((getPSP()) + 3); // Dereference to access the address of the parameter
+        uint32_t *dynamicMemOfEachTask = (uint32_t *)  (*(getPSP()) - MAX_TASKS * 4);
+        uint8_t i;
+        for (i = 0; i < taskCount; i++)
+        {
+            strCopy(namesOfTasks[i], tcb[i].name);
+            baseAddress[i] = (uint32_t)tcb[i].baseAdress;
+            sizeOfTask[i] = tcb[i].sizeOfStack;
+            dynamicMemOfEachTask[i] = dynamicMemoryOfEachTask[i] != 0 ? dynamicMemoryOfEachTask[i] : 0;
+
+        }
+        *taskCountToShell = taskCount;
+        break;
+    }
     }
 }
 
