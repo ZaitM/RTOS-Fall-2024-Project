@@ -1,5 +1,5 @@
 #include "shell_auxiliary.h"
-
+#include "kernel.h"
 /**
  * @brief Detects wether it is alphabetic and returns a boolean
  * @param c Input character
@@ -60,37 +60,42 @@ void getsUart0(USER_DATA *dataStruct)
     char c;
     do
     {
-        c = getcUart0();
-
-        // Blocking function
-        /*
-            ASCII values:
-            127: Delete
-            8: Backspace
-            10: Line Feed
-            13: Carriage Return
-        */
-        while (c == ASCII_DELETE && (count == 0 | count == 1))
+        if (kbhitUart0())
         {
-            if (count > 0)
-                count--;
             c = getcUart0();
-        }
 
-        // Delete or Backspace
-        count = ((c == ASCII_BACKSPACE) | (c == ASCII_DELETE)) ? (count > 0 ? --count : count) : ++count;
+            // Blocking function
+            /*
+                ASCII values:
+                127: Delete
+                8: Backspace
+                10: Line Feed
+                13: Carriage Return
+            */
+            while (c == ASCII_DELETE && (count == 0 | count == 1))
+            {
+                if (count > 0)
+                    count--;
+                c = getcUart0();
+            }
 
-        // LF or CR i.e (Enter or Max char reached) add null terminator
-        if ((c == 10 | c == 13) | count == MAX_CHARS)
-        {
-            dataStruct->buffer[count - 1] = c;
-            dataStruct->buffer[count++] = 0;
-            // Only need when reached max chars
-            c = 0;
+            // Delete or Backspace
+            count = ((c == ASCII_BACKSPACE) | (c == ASCII_DELETE)) ? (count > 0 ? --count : count) : ++count;
+
+            // LF or CR i.e (Enter or Max char reached) add null terminator
+            if ((c == 10 | c == 13) | count == MAX_CHARS)
+            {
+                dataStruct->buffer[count - 1] = c;
+                dataStruct->buffer[count++] = 0;
+                // Only need when reached max chars
+                c = 0;
+            }
+            // Printable character
+            if (c >= 32 && c < 127)
+                dataStruct->buffer[count - 1] = c;
         }
-        // Printable character
-        if (c >= 32 && c < 127)
-            dataStruct->buffer[count - 1] = c;
+        else
+            yield();
     } while (dataStruct->buffer[count - 1] != 0);
 }
 
@@ -158,7 +163,10 @@ void itoa(uint32_t value, char str[], uint8_t base)
     uint8_t i = 0;
     uint8_t j = 0;
     uint8_t remainder;
+    uint32_t original_value = value;
+
     char buffer[10];
+
     while (value != 0)
     {
         if (base == 16)
@@ -179,13 +187,16 @@ void itoa(uint32_t value, char str[], uint8_t base)
     {
         str[j++] = buffer[--i];
     }
-    str[j] = 0;
+    if(!original_value)
+        {str[0] = ASCII_0; str[1] = NULL;}
+    else
+        str[j] = 0;
 }
 
 /**
- * @brief Copy string from str1 to str2
- * @param str1
- * @param str2
+ * @brief Copy string from srcStr to dstStr
+ * @param dstStr
+ * @param srcStr
  */
 void strCopy(char *dstStr, const char *srcStr)
 {
@@ -224,6 +235,19 @@ int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber)
         110: 'n'
     */
     return (fieldNumber < dataStruct->fieldCount) && (dataStruct->fieldType[fieldNumber] == 110) ? atoi(getFieldString(dataStruct, fieldNumber)) : 0;
+}
+
+/**
+ * @brief Returns the length of the string
+ * 
+ * @param str
+ */
+uint8_t stringLength(char *str)
+{
+    uint8_t i = 0;
+    while (str[i] != 0)
+        i++;
+    return i;
 }
 
 /**
