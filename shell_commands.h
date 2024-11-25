@@ -4,7 +4,11 @@
 #include <stdbool.h>
 #include "tm4c123gh6pm.h"
 
-void yield(void);
+//-----------------------------------------------------------------------------
+// RTOS service calls for shell commands
+//-----------------------------------------------------------------------------
+
+// Removed the yield prototype since it is in kernel.h
 void reboot(void);
 void ps(void);
 void ipcs();
@@ -13,7 +17,8 @@ void pkill(const char name[]);
 void pi(bool state);
 void preempt(bool state);
 void sched(bool prio_on);
-void pidof(const char name[]);
+void pidof(const char name[], uint32_t *pid);
+void meminfo(char namesOfTasks[][10], uint32_t *baseAddress, uint32_t *sizeOfTask, uint8_t *taskCount, uint32_t *dynamicMemOfEachTask);
 
 bool inProcessesList(char list[][10], char name[]);
 
