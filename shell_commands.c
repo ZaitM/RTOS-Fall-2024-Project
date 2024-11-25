@@ -105,6 +105,15 @@ void pidof(const char name[], uint32_t *pid)
 }
 
 /**
+ * @brief 
+ * Display the memory usage by all threas, including the base address and size of 
+ * each allocation. Optionally display dynamic memory
+ */
+void meminfo(char namesOfTasks[][10], uint32_t *baseAddress, uint32_t *sizeOfTask, uint8_t *taskCount, uint32_t *dynamicMemOfEachTask)
+{
+    __asm(" SVC #21");
+}
+/**
  * @brief
  * Checks if a process is in the user defined list of processes
  */
