@@ -47,6 +47,7 @@ void strCopy(char *str1, const char *str2);
 
 char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber);
 int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber);
+uint8_t stringLength(char *str);
 // int32_t atoi(char *str);
 
 #endif
