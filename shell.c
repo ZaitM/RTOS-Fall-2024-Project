@@ -22,7 +22,6 @@
 #include "shell_auxiliary.h"
 #include "shell_commands.h"
 
-#define RED_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC - 0x40000000) * 32 + 1 * 4)))
 
 //-----------------------------------------------------------------------------
 // Subroutines
@@ -115,11 +114,11 @@ void shell(void)
 
                         // Printing out the state of the thread
                         statesArray[i] == 0 ? strCopy(str, "INVALID") : statesArray[i] == 1 ? strCopy(str, "STOPPED")
-                                                                    : statesArray[i] == 2   ? strCopy(str, "READY")
-                                                                    : statesArray[i] == 3   ? strCopy(str, "DELAYED")
-                                                                    : statesArray[i] == 4   ? strCopy(str, "BLOCKED_MUTEX")
-                                                                    : statesArray[i] == 5   ? strCopy(str, "BLOCKED_SEMAPHORE")
-                                                                                            : strCopy(str, "UNKNOWN");
+                                                                      : statesArray[i] == 2   ? strCopy(str, "READY")
+                                                                      : statesArray[i] == 3   ? strCopy(str, "DELAYED")
+                                                                      : statesArray[i] == 4   ? strCopy(str, "BLOCKED_MUTEX")
+                                                                      : statesArray[i] == 5   ? strCopy(str, "BLOCKED_SEMAPHORE")
+                                                                      : strCopy(str, "UNKNOWN");
                         putsUart0(str);
                         for (j = stringLength(str); j < 20; j++)
                             putcUart0(' ');
@@ -272,3 +271,4 @@ void shell(void)
         yield();
     }
 }
+
