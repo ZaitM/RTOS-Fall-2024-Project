@@ -37,7 +37,7 @@ void ps(uint32_t* pidsArray, char namesOfTasks[][10], uint32_t* statesArray, uin
  */
 void ipcs()
 {
-    putsUart0("IPCS called\n");
+    __asm(" SVC #14");
 }
 
 /**
@@ -47,19 +47,14 @@ void ipcs()
  */
 void kill(int32_t pid)
 {
-    char str[10];
-
-    itoa(pid, str, 10);
-    putsUart0("PID killed: ");
-    putsUart0(str);
-    putsUart0("\n");
+    // Will use the stopThread function in kernel.c
+    __asm(" SVC #15");
 }
 
 void pkill(const char name[])
 {
-    putsUart0("Process killed: ");
-    putsUart0(name);
-    putsUart0("\n");
+    // Will use the stopThread function in kernel.c
+    __asm(" SVC #16");
 }
 
 /**
@@ -69,7 +64,6 @@ void pkill(const char name[])
  */
 void pi(bool state)
 {
-    state ? putsUart0("pi on\n") : putsUart0("pi off\n");
 }
 
 /**
@@ -113,16 +107,26 @@ void meminfo(char namesOfTasks[][10], uint32_t *baseAddress, uint32_t *sizeOfTas
 {
     __asm(" SVC #21");
 }
+
+/**
+ * @brief
+ * Gets the list of processes
+ */
+void getListOfProcesses(char processList[][10], uint32_t *currentProcessCount)
+{
+    __asm(" SVC #22");
+}
+
 /**
  * @brief
  * Checks if a process is in the user defined list of processes
  */
-bool inProcessesList(char list[][10], char name[])
+bool inProcessesList(char list[][10], char processName[], uint8_t processesCount)
 {
     uint8_t i = 0;
-    for (i = 0; i < 5; i++)
+    for (i = 0; i < processesCount; i++)
     {
-        if (strCmp(list[i], name))
+        if (strCmp(list[i], processName))
         {
             return true;
         }
