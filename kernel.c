@@ -663,7 +663,7 @@ void svCallIsr(void)
                 int i;
                 for (i = 0; i < mutexes[mutexIdx].queueSize; i++)
                 {
-                    mutexes[mutexIdx].processQueue[i] = mutexes[mutexIdx].processQueue[i + 1];  // mutexIdx used to be zero
+                    mutexes[mutexIdx].processQueue[i] = mutexes[mutexIdx].processQueue[i + 1]; // mutexIdx used to be zero
                 }
                 mutexes[mutexIdx].queueSize--; // Decrement the queue size
             }
@@ -851,7 +851,7 @@ void svCallIsr(void)
         // R1: Pointer to the current task count
         // Dereference to access the address of the parameter
         // and recast to uint32_t pointer type to store the value
-        uint32_t *taskCountToShell = (uint32_t *)*((getPSP()) + 1); 
+        uint32_t *taskCountToShell = (uint32_t *)*((getPSP()) + 1);
 
         *taskCountToShell = taskCount;
 
@@ -863,17 +863,18 @@ void svCallIsr(void)
         break;
     }
     }
+}
 
-    void *getPID(void)
-    {
-        return tcb[taskCurrent].pid;
-    }
+void *getPID(void)
+{
+    return tcb[taskCurrent].pid;
+}
 
-    //-----------------------------------------------------------------------------
-    // Glossary
-    //-----------------------------------------------------------------------------
-    /*
-        Reentrant:
-        A function that can be interrupted in the middle of its execution
-        Can be called again before the previous call is completed
-    */
+//-----------------------------------------------------------------------------
+// Glossary
+//-----------------------------------------------------------------------------
+/*
+    Reentrant:
+    A function that can be interrupted in the middle of its execution
+    Can be called again before the previous call is completed
+*/
