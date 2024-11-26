@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "kernel.h"
+
 #define NUM_SRAM_REGIONS 5
 
 #define TOP_OF_HEAP 0x20008000
@@ -94,6 +96,8 @@ typedef struct
     uint16_t sizeOfAllocations[8];
 
 } MEM_REGION;
+
+dynamicMemoryOfEachTask[MAX_TASKS];
 
 //-----------------------------------------------------------------------------
 // Subroutines
