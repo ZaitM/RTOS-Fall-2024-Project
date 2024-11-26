@@ -26,7 +26,7 @@ void reboot(void)
  * Displays the process status.
  * For now, it displays the text "ps called"
  */
-void ps(uint32_t* pidsArray, char namesOfTasks[][10], uint32_t* statesArray, uint8_t* mutex_semaphore_array)
+void ps(uint32_t *pidsArray, char namesOfTasks[][10], uint32_t *statesArray, uint8_t *mutex_semaphore_array)
 {
     __asm(" SVC #13");
 }
@@ -48,13 +48,15 @@ void ipcs()
 void kill(int32_t pid)
 {
     // Will use the stopThread function in kernel.c
-    __asm(" SVC #15");
+    // SVC #3
+    stopThread((void *)pid);
 }
 
 void pkill(const char name[])
 {
     // Will use the stopThread function in kernel.c
-    __asm(" SVC #16");
+    // SVC #3
+    stopThread((void *)name);
 }
 
 /**
@@ -99,8 +101,8 @@ void pidof(const char name[], uint32_t *pid)
 }
 
 /**
- * @brief 
- * Display the memory usage by all threas, including the base address and size of 
+ * @brief
+ * Display the memory usage by all threas, including the base address and size of
  * each allocation. Optionally display dynamic memory
  */
 void meminfo(char namesOfTasks[][10], uint32_t *baseAddress, uint32_t *sizeOfTask, uint8_t *taskCount, uint32_t *dynamicMemOfEachTask)
