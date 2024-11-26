@@ -72,14 +72,65 @@ void shell(void)
 
             if (isCommand(&data, "reboot", 0))
             {
-                putsUart0("Rebooting...\n\n");
                 reboot();
                 foo = true;
             }
             else if (isCommand(&data, "ps", 0))
             {
-                ps();
-                foo = true;
+                uint32_t pidsArray[MAX_TASKS] = {0};
+                char namesOfTasks[MAX_TASKS][10] = {0};
+                uint32_t statesArray[MAX_TASKS] = {0};
+                uint8_t mutex_semaphore_array[MAX_TASKS] = {0};
+
+                ps(pidsArray, namesOfTasks, statesArray, mutex_semaphore_array);
+
+                uint8_t i = 0;
+                putsUart0("\nPID\t\tName\t\tCPU%\tState\t\tMutex/Semaphore\n");
+                putsUart0("------------------------------------------------------------------------------\n\n");
+                for (i = 0; i < MAX_TASKS; i++)
+                {
+                    if (pidsArray[i])
+                    {
+                        uint8_t j = 0;
+
+                        char str[20] = {0};
+
+                        // Printing out the PID
+                        putsUart0("0x");
+                        itoa(pidsArray[i], str, 16);
+                        putsUart0(str);
+                        for (j = stringLength(str) + 2; j < 16; j++)
+                            putcUart0(' ');
+
+                        // Printing the thread name
+                        putsUart0(namesOfTasks[i]);
+                        for (j = stringLength(namesOfTasks[i]); j < 16; j++)
+                            putcUart0(' ');
+
+                        // Print the CPU percentage
+                        // Print zero for now
+                        putcUart0('0');
+                        for (j = 0; j < 8; j++)
+                            putcUart0(' ');
+
+                        // Printing out the state of the thread
+                        statesArray[i] == 0 ? strCopy(str, "INVALID") : statesArray[i] == 1 ? strCopy(str, "STOPPED")
+                                                                    : statesArray[i] == 2   ? strCopy(str, "READY")
+                                                                    : statesArray[i] == 3   ? strCopy(str, "DELAYED")
+                                                                    : statesArray[i] == 4   ? strCopy(str, "BLOCKED_MUTEX")
+                                                                    : statesArray[i] == 5   ? strCopy(str, "BLOCKED_SEMAPHORE")
+                                                                                            : strCopy(str, "UNKNOWN");
+                        putsUart0(str);
+                        for (j = stringLength(str); j < 20; j++)
+                            putcUart0(' ');
+
+                        // Printing out the mutex or semaphore
+                        itoa(mutex_semaphore_array[i], str, 10);
+                        putsUart0(str);
+                        putcUart0('\n');
+                    }
+                }
+                putsUart0("\n");
             }
             else if (isCommand(&data, "ipcs", 0))
             {
@@ -168,7 +219,7 @@ void shell(void)
                 char strBuffer[MAX_CHARS] = {0};
                 uint32_t baseAddress[MAX_TASKS] = {0};
                 uint32_t sizeOfTask[MAX_TASKS] = {0};
-                uint32_t dynamicMemOfEachTask[MAX_TASKS] = {1,1,1,1,1,1,1,1,1,1,1,1};
+                uint32_t dynamicMemOfEachTask[MAX_TASKS] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
                 uint8_t taskCount = 0;
 
                 putsUart0("\nTask Name\tBase Address\tSize\t\tDynamic Memory\n");
@@ -196,11 +247,11 @@ void shell(void)
                     // Print the size of the task
                     itoa(sizeOfTask[i], strBuffer, 10);
                     putsUart0(strBuffer);
-                    for(j = stringLength(strBuffer); j < 16; j++)
+                    for (j = stringLength(strBuffer); j < 16; j++)
                         putcUart0(' ');
 
                     // Print the dynamic memory of each task
-                    itoa(dynamicMemOfEachTask[i],strBuffer,10);
+                    itoa(dynamicMemOfEachTask[i], strBuffer, 10);
                     putsUart0(strBuffer);
 
                     putcUart0('\n');
