@@ -26,9 +26,9 @@ void reboot(void)
  * Displays the process status.
  * For now, it displays the text "ps called"
  */
-void ps(void)
+void ps(uint32_t* pidsArray, char namesOfTasks[][10], uint32_t* statesArray, uint8_t* mutex_semaphore_array)
 {
-    putsUart0("ps called\n");
+    __asm(" SVC #13");
 }
 
 /**
