@@ -43,7 +43,7 @@ void getsUart0(USER_DATA *dataStruct);
 void parseFields(USER_DATA *dataStruct);
 void clearStruct(USER_DATA *dataStruct);
 void itoa(uint32_t value, char str[], uint8_t base);
-void strCopy(char *str1, const char *str2);
+void strCopy(char *dstStr, const char *srcStr);
 
 char *getFieldString(USER_DATA *dataStruct, uint8_t fieldNumber);
 int32_t getFieldInteger(USER_DATA *dataStruct, uint8_t fieldNumber);
