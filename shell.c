@@ -22,7 +22,6 @@
 #include "shell_auxiliary.h"
 #include "shell_commands.h"
 
-
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
@@ -32,6 +31,13 @@ void shell(void)
 {
     USER_DATA data;
     data.fieldCount = 0;
+
+    // Get the list of processes
+    char processList[MAX_TASKS][10] = {0};
+    uint32_t processesCount = 0;
+
+    // Initially get the list of processes when we start the shell
+    getListOfProcesses(processList, &processesCount);
 
     // Clear the screen and move the cursor to the top left
     putsUart0("\033[2J\033[H");
@@ -74,6 +80,15 @@ void shell(void)
                 reboot();
                 foo = true;
             }
+            else if (inProcessesList(processList, data.buffer, processesCount))
+            {
+                putsUart0("Process already running\n\n");
+
+                // Update the list of processes
+                getListOfProcesses(processList, &processesCount);
+
+                foo = true;
+            }
             else if (isCommand(&data, "ps", 0))
             {
                 uint32_t pidsArray[MAX_TASKS] = {0};
@@ -114,11 +129,11 @@ void shell(void)
 
                         // Printing out the state of the thread
                         statesArray[i] == 0 ? strCopy(str, "INVALID") : statesArray[i] == 1 ? strCopy(str, "STOPPED")
-                                                                      : statesArray[i] == 2   ? strCopy(str, "READY")
-                                                                      : statesArray[i] == 3   ? strCopy(str, "DELAYED")
-                                                                      : statesArray[i] == 4   ? strCopy(str, "BLOCKED_MUTEX")
-                                                                      : statesArray[i] == 5   ? strCopy(str, "BLOCKED_SEMAPHORE")
-                                                                      : strCopy(str, "UNKNOWN");
+                                                                    : statesArray[i] == 2   ? strCopy(str, "READY")
+                                                                    : statesArray[i] == 3   ? strCopy(str, "DELAYED")
+                                                                    : statesArray[i] == 4   ? strCopy(str, "BLOCKED_MUTEX")
+                                                                    : statesArray[i] == 5   ? strCopy(str, "BLOCKED_SEMAPHORE")
+                                                                                            : strCopy(str, "UNKNOWN");
                         putsUart0(str);
                         for (j = stringLength(str); j < 20; j++)
                             putcUart0(' ');
@@ -143,7 +158,14 @@ void shell(void)
             }
             else if (isCommand(&data, "pkill", 1))
             {
-                pkill(getFieldString(&data, 1));
+                if (inProcessesList(processList, getFieldString(&data, 1), processesCount))
+                {
+
+                    pkill(getFieldString(&data, 1));
+                }
+            
+                // Update the list of processes
+                getListOfProcesses(processList, &processesCount);
                 foo = true;
             }
             else if (isCommand(&data, "pi", 1))
@@ -271,4 +293,3 @@ void shell(void)
         yield();
     }
 }
-
