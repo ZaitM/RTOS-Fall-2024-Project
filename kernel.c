@@ -51,6 +51,7 @@
 #define SVC_SCHED 19
 #define SVC_PIDOF 20
 #define SVC_MEMINFO 21
+#define SVC_GET_PROCESSES 22
 
 /*
     The PSR is a combination of the following:
@@ -316,7 +317,7 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             {
                 i++;
             }
-             uint32_t size = ALIGN_SIZE(stackBytes);
+            uint32_t size = ALIGN_SIZE(stackBytes);
             // 1. Create a void pointer. Preallocate memory for the thread
             void *ptr = mallocFromHeap(size);
 
@@ -332,7 +333,7 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
             // Adjust the sp to the top of the stack
             tcb[i].sp = (void *)((uint32_t)ptr + size);
             tcb[i].spInit = (void *)((uint32_t)ptr + size); // May not need this as mentioned in class
-            tcb[i].priority = priority;                           //
+            tcb[i].priority = priority;                     //
             tcb[i].srd = createNoSramAccessMask();
 
             // 3.  Configure/Modify the srd bit mask
@@ -394,17 +395,28 @@ bool createThread(_fn fn, const char name[], uint8_t priority, uint32_t stackByt
 // REQUIRED: modify this function to restart a thread
 void restartThread(_fn fn)
 {
+    __asm(" SVC #2");
 }
 
 // REQUIRED: modify this function to stop a thread
 // REQUIRED: remove any pending semaphore waiting, unlock any mutexes
 void stopThread(_fn fn)
 {
+    __asm(" SVC #3");
 }
 
 // REQUIRED: modify this function to set a thread priority
 void setThreadPriority(_fn fn, uint8_t priority)
 {
+    uint8_t i = 0;
+    for (i = 0; i < taskCount; i++)
+    {
+        if (tcb[i].pid == fn)
+        {
+            tcb[i].priority = priority;
+            break;
+        }
+    }
 }
 
 // REQUIRED: modify this function to yield execution back to scheduler using pendsv
@@ -651,7 +663,7 @@ void svCallIsr(void)
                 int i;
                 for (i = 0; i < mutexes[mutexIdx].queueSize; i++)
                 {
-                    mutexes[mutexIdx].processQueue[i] = mutexes[0].processQueue[i + 1];
+                    mutexes[mutexIdx].processQueue[i] = mutexes[mutexIdx].processQueue[i + 1];  // mutexIdx used to be zero
                 }
                 mutexes[mutexIdx].queueSize--; // Decrement the queue size
             }
@@ -749,6 +761,28 @@ void svCallIsr(void)
         NVIC_APINT_R = NVIC_APINT_VECTKEY | NVIC_APINT_SYSRESETREQ;
         break;
     }
+    case SVC_PS:
+    {
+        // R0: Address to an array of char
+        // R1: Address to an array of uint32_t
+        // R2: Address to an array of uint32_t for the sizes of each task
+        // R3: Pointer to the task count
+        uint32_t *pidsArray = (uint32_t *)*((getPSP()));
+        char(*namesOfTasks)[10] = (char(*)[10]) * (getPSP() + 1);
+        uint32_t *statesArray = (uint32_t *)*((getPSP()) + 2);
+        uint8_t *mutex_semaphore_array = (uint8_t *)*((getPSP()) + 3); // Dereference to access the address of the parameter
+
+        uint8_t i;
+        for (i = 0; i < taskCount; i++)
+        {
+            pidsArray[i] = (uint32_t)tcb[i].pid;
+            strCopy(namesOfTasks[i], tcb[i].name);
+            statesArray[i] = tcb[i].state;
+
+            mutex_semaphore_array[i] = tcb[i].mutex != 0 ? tcb[i].mutex : tcb[i].semaphore;
+        }
+        break;
+    }
     case SVC_PREEMPT:
     {
         bool status = *getPSP();
@@ -794,11 +828,11 @@ void svCallIsr(void)
         // R3: Pointer to the task count
         // Let shell know how many tasks are running i.e. taskCount (global variable in kernel.c)
 
-        char(*namesOfTasks)[10] =       (char(*)[10]) * (getPSP());
-        uint32_t *baseAddress =         ( uint32_t *)  *((getPSP()) + 1);
-        uint32_t *sizeOfTask =           (uint32_t *)  *((getPSP()) + 2);
-        uint8_t *taskCountToShell =      (uint8_t *)   *((getPSP()) + 3); // Dereference to access the address of the parameter
-        uint32_t *dynamicMemOfEachTask = (uint32_t *)  (*(getPSP()) - MAX_TASKS * 4);
+        char(*namesOfTasks)[10] = (char(*)[10]) * (getPSP());
+        uint32_t *baseAddress = (uint32_t *)*((getPSP()) + 1);
+        uint32_t *sizeOfTask = (uint32_t *)*((getPSP()) + 2);
+        uint8_t *taskCountToShell = (uint8_t *)*((getPSP()) + 3); // Dereference to access the address of the parameter
+        uint32_t *dynamicMemOfEachTask = (uint32_t *)(*(getPSP()) - MAX_TASKS * 4);
         uint8_t i;
         for (i = 0; i < taskCount; i++)
         {
@@ -806,24 +840,40 @@ void svCallIsr(void)
             baseAddress[i] = (uint32_t)tcb[i].baseAdress;
             sizeOfTask[i] = tcb[i].sizeOfStack;
             dynamicMemOfEachTask[i] = dynamicMemoryOfEachTask[i] != 0 ? dynamicMemoryOfEachTask[i] : 0;
-
         }
         *taskCountToShell = taskCount;
         break;
     }
+    case SVC_GET_PROCESSES:
+    {
+        // R0: Address to an array of char
+        char(*namesOfTasks)[10] = (char(*)[10]) * (getPSP());
+        // R1: Pointer to the current task count
+        // Dereference to access the address of the parameter
+        // and recast to uint32_t pointer type to store the value
+        uint32_t *taskCountToShell = (uint32_t *)*((getPSP()) + 1); 
+
+        *taskCountToShell = taskCount;
+
+        uint8_t i;
+        for (i = 0; i < taskCount; i++)
+        {
+            strCopy(namesOfTasks[i], tcb[i].name);
+        }
+        break;
     }
-}
+    }
 
-void *getPID(void)
-{
-    return tcb[taskCurrent].pid;
-}
+    void *getPID(void)
+    {
+        return tcb[taskCurrent].pid;
+    }
 
-//-----------------------------------------------------------------------------
-// Glossary
-//-----------------------------------------------------------------------------
-/*
-    Reentrant:
-    A function that can be interrupted in the middle of its execution
-    Can be called again before the previous call is completed
-*/
+    //-----------------------------------------------------------------------------
+    // Glossary
+    //-----------------------------------------------------------------------------
+    /*
+        Reentrant:
+        A function that can be interrupted in the middle of its execution
+        Can be called again before the previous call is completed
+    */
