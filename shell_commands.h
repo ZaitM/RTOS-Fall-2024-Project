@@ -10,7 +10,7 @@
 
 // Removed the yield prototype since it is in kernel.h
 void reboot(void);
-void ps(void);
+void ps(uint32_t *pidsArray, char namesOfTasks[][10], uint32_t *statesArray, uint8_t *mutex_semaphore_array);
 void ipcs();
 void kill(int32_t pid);
 void pkill(const char name[]);
